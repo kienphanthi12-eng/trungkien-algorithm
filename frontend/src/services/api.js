@@ -1,5 +1,5 @@
-// Hardcoded backend URL for local testing as per user instructions
-const API_BASE_URL = 'http://localhost:8000';
+// Backend URL updated to Railway production
+const API_BASE_URL = 'https://trungkien-algorithm-production.up.railway.app';
 
 export async function login(email, password) {
   const response = await fetch(`${API_BASE_URL}/auth/login`, {
