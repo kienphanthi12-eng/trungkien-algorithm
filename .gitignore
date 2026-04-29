@@ -1,0 +1,57 @@
+# ========================
+# ENVIRONMENT VARIABLES
+# ========================
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+backend/.env
+frontend/.env
+
+# ========================
+# PYTHON / BACKEND
+# ========================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+venv/
+env/
+ENV/
+
+# ========================
+# NODE / FRONTEND
+# ========================
+node_modules/
+dist/
+dist-ssr/
+*.local
+.npm
+npm-debug.log*
+
+# ========================
+# IDEs & OS FILES
+# ========================
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
