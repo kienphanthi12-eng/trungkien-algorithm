@@ -6,14 +6,11 @@ import os
 
 app = FastAPI(title="TrungKien Algorithm API", version="1.0.0")
 
-# CORS config
-frontend_url = os.getenv("FRONTEND_URL", "*")
-allow_origins = [url.strip() for url in frontend_url.split(",")] if frontend_url != "*" else ["*"]
-
+# CORS config - Allow all origins for Phase 1 to avoid "Failed to fetch" errors
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allow_origins,
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
