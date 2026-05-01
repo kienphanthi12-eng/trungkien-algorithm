@@ -29,6 +29,7 @@ export async function register(email, password, name, role) {
   
   if (!response.ok) {
     const error = await response.json();
+    console.error("api.js register error response:", error, "Status:", response.status);
     throw new Error(error.detail || 'Đăng ký thất bại');
   }
   
@@ -44,7 +45,14 @@ export async function getMe(token) {
   });
   
   if (!response.ok) {
-    throw new Error('Unauthorized');
+    let errorDetail = 'Lỗi xác thực (Unauthorized)';
+    try {
+      const error = await response.json();
+      errorDetail = error.detail || errorDetail;
+    } catch (e) {
+      // ignore json parse error
+    }
+    throw new Error(errorDetail);
   }
   
   return response.json();

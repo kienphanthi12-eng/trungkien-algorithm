@@ -23,7 +23,20 @@ export default function Login() {
       loginUser(data.access_token, fullUser);
       navigate('/');
     } catch (err) {
-      setError(err.message);
+      let errorMsg = err.message;
+      const lowerError = errorMsg.toLowerCase();
+      
+      if (lowerError.includes('invalid credentials') || lowerError.includes('invalid login credentials')) {
+        errorMsg = 'Email hoặc mật khẩu không chính xác.';
+      } else if (lowerError.includes('unauthorized')) {
+        errorMsg = 'Lỗi xác thực. Vui lòng đăng nhập lại.';
+      } else if (lowerError.includes('user not found')) {
+        errorMsg = 'Tài khoản không tồn tại hoặc chưa được kích hoạt.';
+      } else {
+        errorMsg = `Đã xảy ra lỗi: ${errorMsg}`;
+      }
+      
+      setError(errorMsg);
     } finally {
       setLoading(false);
     }
