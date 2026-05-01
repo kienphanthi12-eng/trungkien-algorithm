@@ -82,13 +82,29 @@ def get_me(current_user = Depends(get_current_user)):
         
         # Check if data exists
         if not db_response.data or len(db_response.data) == 0:
-            print("ERROR: No data returned from query")
-            raise HTTPException(status_code=404, detail="User not found in database")
-        
-        # Get first item from array
-        user_data = db_response.data[0]
-        
-        print(f"User found: {user_data}")
+            print(f"User {current_user.email} not found in public.users. Attempting to auto-create profile...")
+            # Auto-create profile if missing (helps with failed registrations or manual Auth additions)
+            user_id = str(current_user.id)
+            user_metadata = getattr(current_user, 'user_metadata', {}) or {}
+            
+            new_user_data = {
+                "id": user_id,
+                "email": current_user.email,
+                "name": user_metadata.get("name", current_user.email.split('@')[0]),
+                "role": user_metadata.get("role", "student")
+            }
+            
+            try:
+                supabase_client.table("users").insert(new_user_data).execute()
+                user_data = new_user_data
+                print(f"Auto-created profile: {user_data}")
+            except Exception as insert_err:
+                print(f"Auto-create failed: {str(insert_err)}")
+                raise HTTPException(status_code=404, detail="User not found in database and auto-creation failed")
+        else:
+            # Get first item from array
+            user_data = db_response.data[0]
+            print(f"User found: {user_data}")
         
         return {
             "id": user_id,
