@@ -31,10 +31,28 @@ export default function Dashboard() {
 
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
-          <div className="border-4 border-dashed border-gray-200 rounded-lg h-96 flex flex-col items-center justify-center text-gray-500 bg-white shadow-sm">
-            <p className="text-2xl font-bold mb-4 text-gray-800">Chào mừng đến với Nền tảng Học Toán!</p>
-            <p className="text-lg">Phase 1: Đăng nhập & Đăng ký đã được hoàn tất thành công.</p>
-            <p className="mt-2 text-sm text-gray-400">Các tính năng của {user?.role === 'teacher' ? 'Giáo viên' : 'Học sinh'} sẽ được cập nhật ở Phase tiếp theo.</p>
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {user?.role === 'teacher' && (
+              <a 
+                href="/students"
+                className="block p-6 bg-white rounded-lg border border-gray-200 shadow-md hover:bg-gray-50 transition-colors"
+              >
+                <div className="flex items-center mb-2">
+                  <div className="p-2 bg-blue-100 rounded-lg text-blue-600 mr-3">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                    </svg>
+                  </div>
+                  <h5 className="text-xl font-bold tracking-tight text-gray-900">Quản lý học sinh</h5>
+                </div>
+                <p className="font-normal text-gray-700">Xem danh sách, thêm hoặc xóa học sinh trong lớp của bạn.</p>
+              </a>
+            )}
+            
+            <div className="p-6 bg-white rounded-lg border border-gray-200 shadow-md">
+              <h5 className="mb-2 text-xl font-bold tracking-tight text-gray-900">Thông báo</h5>
+              <p className="font-normal text-gray-700">Phase 2: Quản lý học sinh đã được triển khai. Bạn có thể bắt đầu thêm học sinh của mình.</p>
+            </div>
           </div>
         </div>
       </main>

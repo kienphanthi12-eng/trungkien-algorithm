@@ -20,3 +20,12 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f"Authentication failed: {str(e)}",
         )
+
+def get_current_teacher(current_user = Depends(get_current_user)):
+    db_response = supabase_client.table("users").select("role").eq("id", current_user.id).execute()
+    if not db_response.data or db_response.data[0]["role"] != "teacher":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only teachers can access this resource",
+        )
+    return current_user

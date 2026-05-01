@@ -57,3 +57,47 @@ export async function getMe(token) {
   
   return response.json();
 }
+
+export async function getStudents(token) {
+  const response = await fetch(`${API_BASE_URL}/students/`, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Lỗi khi tải danh sách học sinh');
+  }
+  return response.json();
+}
+
+export async function addStudent(token, email) {
+  const response = await fetch(`${API_BASE_URL}/students/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify({ email }),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Lỗi khi thêm học sinh');
+  }
+  return response.json();
+}
+
+export async function removeStudent(token, studentId) {
+  const response = await fetch(`${API_BASE_URL}/students/${studentId}`, {
+    method: 'DELETE',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Lỗi khi xóa học sinh');
+  }
+  return response.json();
+}
