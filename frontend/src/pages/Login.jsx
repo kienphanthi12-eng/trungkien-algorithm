@@ -15,17 +15,25 @@ export default function Login() {
     e.preventDefault();
     setError('');
     setLoading(true);
-    
+
     try {
+      // Step 1: authenticate credentials
       const data = await login(email, password);
-      // Fetch full details since login only returns partial info
-      const fullUser = await getMe(data.access_token);
-      loginUser(data.access_token, fullUser);
+
+      // Step 2: fetch full profile — if this fails, still log in with basic data
+      try {
+        const fullUser = await getMe(data.access_token);
+        loginUser(data.access_token, fullUser);
+      } catch (profileErr) {
+        // Login succeeded but profile lookup failed — proceed with minimal user data
+        loginUser(data.access_token, data.user);
+      }
+
       navigate('/');
     } catch (err) {
       let errorMsg = err.message;
       const lowerError = errorMsg.toLowerCase();
-      
+
       if (lowerError.includes('invalid credentials') || lowerError.includes('invalid login credentials')) {
         errorMsg = 'Email hoặc mật khẩu không chính xác.';
       } else if (lowerError.includes('unauthorized')) {
@@ -35,7 +43,7 @@ export default function Login() {
       } else {
         errorMsg = `Đã xảy ra lỗi: ${errorMsg}`;
       }
-      
+
       setError(errorMsg);
     } finally {
       setLoading(false);

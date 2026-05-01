@@ -31,7 +31,20 @@ export default function Register() {
       }
     } catch (err) {
       console.error("Register catch block error:", err);
-      setError(err.message);
+      let errorMsg = err.message;
+      const lowerError = errorMsg.toLowerCase();
+
+      if (lowerError.includes('already registered') || lowerError.includes('already exists')) {
+        errorMsg = 'Email này đã được đăng ký. Vui lòng đăng nhập hoặc dùng email khác.';
+      } else if (lowerError.includes('user not allowed')) {
+        errorMsg = 'Đăng ký không được phép. Email có thể đã được đăng ký hoặc hệ thống tạm thời không cho phép đăng ký mới.';
+      } else if (lowerError.includes('invalid email')) {
+        errorMsg = 'Địa chỉ email không hợp lệ.';
+      } else if (lowerError.includes('password')) {
+        errorMsg = 'Mật khẩu phải có ít nhất 6 ký tự.';
+      }
+
+      setError(errorMsg);
     } finally {
       setLoading(false);
     }
