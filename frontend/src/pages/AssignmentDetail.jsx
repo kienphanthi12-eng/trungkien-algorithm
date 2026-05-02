@@ -1,7 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useParams, Link } from 'react-router-dom';
-import { getAssignment, deleteAssignment } from '../services/api';
+import {
+  getAssignment,
+  deleteAssignment,
+  createSubmission,
+  getSubmissionByAssignment,
+  gradeSubmission,
+} from '../services/api';
 import { useNavigate } from 'react-router-dom';
 
 const STATUS_LABEL = {
@@ -10,24 +16,53 @@ const STATUS_LABEL = {
   graded: { text: 'Đã chấm', cls: 'bg-green-100 text-green-800 border-green-200' },
 };
 
+function ScoreBadge({ score }) {
+  if (score === null || score === undefined) return null;
+  const s = parseFloat(score);
+  let cls = 'bg-red-100 text-red-800';
+  if (s >= 8) cls = 'bg-green-100 text-green-800';
+  else if (s >= 6) cls = 'bg-yellow-100 text-yellow-800';
+  else if (s >= 4) cls = 'bg-orange-100 text-orange-800';
+  return (
+    <span className={`inline-block px-3 py-1 text-lg font-bold rounded-full ${cls}`}>
+      {s.toFixed(1)} / 10
+    </span>
+  );
+}
+
 export default function AssignmentDetail() {
   const { user, token, logoutUser } = useAuth();
   const { assignmentId } = useParams();
   const navigate = useNavigate();
+
   const [assignment, setAssignment] = useState(null);
+  const [submission, setSubmission] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  // Submission form state
+  const [answerText, setAnswerText] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+
+  // Grading state
+  const [grading, setGrading] = useState(false);
+  const [gradeError, setGradeError] = useState('');
+
   useEffect(() => {
-    fetchAssignment();
+    fetchData();
   }, [assignmentId]);
 
-  const fetchAssignment = async () => {
+  const fetchData = async () => {
     try {
       setLoading(true);
-      const data = await getAssignment(token, assignmentId);
-      setAssignment(data);
-      setError('');
+      const [assignData, subData] = await Promise.allSettled([
+        getAssignment(token, assignmentId),
+        getSubmissionByAssignment(token, assignmentId),
+      ]);
+      if (assignData.status === 'fulfilled') setAssignment(assignData.value);
+      else setError(assignData.reason.message);
+      if (subData.status === 'fulfilled') setSubmission(subData.value);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -42,6 +77,44 @@ export default function AssignmentDetail() {
       navigate('/assignments');
     } catch (err) {
       setError(err.message);
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!answerText.trim()) {
+      setSubmitError('Vui lòng nhập bài làm của bạn.');
+      return;
+    }
+    try {
+      setSubmitting(true);
+      setSubmitError('');
+      const sub = await createSubmission(token, {
+        assignment_id: assignmentId,
+        text_content: answerText,
+        image_urls: [],
+      });
+      setSubmission(sub);
+      setAssignment((prev) => prev ? { ...prev, status: 'submitted' } : prev);
+    } catch (err) {
+      setSubmitError(err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleGrade = async () => {
+    if (!submission) return;
+    try {
+      setGrading(true);
+      setGradeError('');
+      const updated = await gradeSubmission(token, submission.id);
+      setSubmission(updated);
+      setAssignment((prev) => prev ? { ...prev, status: 'graded' } : prev);
+    } catch (err) {
+      setGradeError(err.message);
+    } finally {
+      setGrading(false);
     }
   };
 
@@ -76,9 +149,11 @@ export default function AssignmentDetail() {
 
   const statusInfo = STATUS_LABEL[assignment.status] || STATUS_LABEL.pending;
   const isOverdue = assignment.due_date && new Date(assignment.due_date) < new Date() && assignment.status === 'pending';
+  const grade = submission?.grade;
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Nav */}
       <nav className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
@@ -115,19 +190,23 @@ export default function AssignmentDetail() {
             <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">{error}</div>
           )}
 
-          <div className="bg-white shadow rounded-lg overflow-hidden">
+          {/* Assignment card */}
+          <div className="bg-white shadow rounded-lg overflow-hidden mb-6">
             {/* Header */}
             <div className="px-6 py-5 border-b border-gray-200 flex items-start justify-between">
               <div>
-                <h1 className="text-2xl font-bold text-gray-900 mb-1">Chi tiết bài tập</h1>
-                <span className={`inline-block px-3 py-1 text-sm font-medium rounded-full border ${statusInfo.cls}`}>
-                  {statusInfo.text}
-                </span>
-                {isOverdue && (
-                  <span className="ml-2 inline-block px-3 py-1 text-sm font-medium rounded-full bg-red-100 text-red-800 border border-red-200">
-                    Quá hạn
+                <h1 className="text-2xl font-bold text-gray-900 mb-2">Chi tiết bài tập</h1>
+                <div className="flex flex-wrap gap-2 items-center">
+                  <span className={`inline-block px-3 py-1 text-sm font-medium rounded-full border ${statusInfo.cls}`}>
+                    {statusInfo.text}
                   </span>
-                )}
+                  {isOverdue && (
+                    <span className="inline-block px-3 py-1 text-sm font-medium rounded-full bg-red-100 text-red-800 border border-red-200">
+                      Quá hạn
+                    </span>
+                  )}
+                  {grade && <ScoreBadge score={grade.score} />}
+                </div>
               </div>
               {user?.role === 'teacher' && (
                 <button
@@ -139,12 +218,12 @@ export default function AssignmentDetail() {
               )}
             </div>
 
-            <div className="px-6 py-5 space-y-6">
+            <div className="px-6 py-5 space-y-4">
               {/* Problem info */}
               <div className="bg-gray-50 rounded-lg p-4">
-                <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Bài toán</h2>
+                <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Bài toán</h2>
                 <div className="flex items-center justify-between">
-                  <span className="text-lg font-medium text-gray-900">
+                  <span className="text-base font-medium text-gray-900">
                     {assignment.problem_title || 'Bài toán không xác định'}
                   </span>
                   <Link
@@ -156,43 +235,170 @@ export default function AssignmentDetail() {
                 </div>
               </div>
 
-              {/* Assignment info */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {user?.role === 'teacher' && (
                   <div className="bg-gray-50 rounded-lg p-4">
-                    <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">Học sinh</h2>
+                    <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Học sinh</h2>
                     <p className="text-base font-medium text-gray-900">{assignment.student_name || '—'}</p>
                     {assignment.student_email && (
                       <p className="text-sm text-gray-600 mt-1">{assignment.student_email}</p>
                     )}
                   </div>
                 )}
-
                 <div className="bg-gray-50 rounded-lg p-4">
-                  <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">Ngày giao</h2>
+                  <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Ngày giao</h2>
                   <p className="text-base font-medium text-gray-900">{formatDate(assignment.assigned_at)}</p>
                 </div>
-
                 <div className={`bg-gray-50 rounded-lg p-4 ${isOverdue ? 'border border-red-200 bg-red-50' : ''}`}>
-                  <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">Hạn nộp</h2>
+                  <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Hạn nộp</h2>
                   <p className={`text-base font-medium ${isOverdue ? 'text-red-700' : 'text-gray-900'}`}>
                     {assignment.due_date ? formatDate(assignment.due_date) : 'Không có hạn'}
                   </p>
                 </div>
               </div>
+            </div>
+          </div>
 
-              {/* Student actions */}
-              {user?.role === 'student' && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <p className="text-sm text-blue-700 font-medium mb-1">Nộp bài</p>
-                  <p className="text-sm text-blue-600">
-                    Tính năng nộp bài sẽ có ở Phase 5. Hiện tại trạng thái bài tập của bạn là:{' '}
-                    <strong>{statusInfo.text}</strong>.
-                  </p>
+          {/* ── STUDENT: Submit form ── */}
+          {user?.role === 'student' && assignment.status === 'pending' && !submission && (
+            <div className="bg-white shadow rounded-lg overflow-hidden mb-6">
+              <div className="px-6 py-4 border-b border-gray-200">
+                <h2 className="text-lg font-semibold text-gray-900">📝 Nộp bài</h2>
+              </div>
+              <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
+                {submitError && (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">{submitError}</div>
+                )}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Bài làm của bạn <span className="text-red-500">*</span>
+                  </label>
+                  <textarea
+                    value={answerText}
+                    onChange={(e) => setAnswerText(e.target.value)}
+                    rows={10}
+                    placeholder="Nhập code hoặc lời giải của bạn tại đây..."
+                    className="w-full rounded-md border border-gray-300 p-3 text-sm font-mono focus:border-blue-500 focus:ring-blue-500 resize-y"
+                    required
+                  />
+                </div>
+                <div className="flex justify-end">
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors font-medium"
+                  >
+                    {submitting ? 'Đang nộp...' : '📤 Nộp bài'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {/* ── SUBMISSION VIEW (student & teacher) ── */}
+          {submission && (
+            <div className="bg-white shadow rounded-lg overflow-hidden mb-6">
+              <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-gray-900">📄 Bài nộp</h2>
+                <span className="text-xs text-gray-500">Nộp lúc: {formatDate(submission.submitted_at)}</span>
+              </div>
+              <div className="px-6 py-5">
+                <pre className="bg-gray-50 border border-gray-200 rounded p-4 text-sm font-mono whitespace-pre-wrap overflow-x-auto max-h-80 overflow-y-auto">
+                  {submission.text_content || '(Không có nội dung)'}
+                </pre>
+              </div>
+
+              {/* Teacher: Grade button */}
+              {user?.role === 'teacher' && (
+                <div className="px-6 pb-5">
+                  {gradeError && (
+                    <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">{gradeError}</div>
+                  )}
+                  <button
+                    onClick={handleGrade}
+                    disabled={grading}
+                    className="px-5 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50 transition-colors font-medium flex items-center gap-2"
+                  >
+                    {grading ? (
+                      <>
+                        <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                        </svg>
+                        Đang chấm bài (AI)...
+                      </>
+                    ) : (
+                      <>🤖 {grade ? 'Chấm lại bằng AI' : 'Chấm bài bằng AI'}</>
+                    )}
+                  </button>
+                  {grading && (
+                    <p className="mt-2 text-xs text-gray-500">Đang gọi AI chấm bài, có thể mất 10-30 giây...</p>
+                  )}
                 </div>
               )}
             </div>
-          </div>
+          )}
+
+          {/* ── GRADE RESULT ── */}
+          {grade && (
+            <div className="bg-white shadow rounded-lg overflow-hidden">
+              <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-gray-900">🏆 Kết quả chấm bài</h2>
+                <div className="flex items-center gap-3">
+                  <ScoreBadge score={grade.score} />
+                  <span className="text-xs text-gray-500">Chấm lúc: {formatDate(grade.graded_at)}</span>
+                </div>
+              </div>
+              <div className="px-6 py-5 space-y-4">
+                {/* Overall feedback */}
+                {grade.feedback_json?.overall && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <h3 className="text-sm font-semibold text-blue-700 mb-2">Nhận xét tổng thể</h3>
+                    <p className="text-sm text-blue-900">{grade.feedback_json.overall}</p>
+                  </div>
+                )}
+
+                {/* Criteria breakdown */}
+                {grade.feedback_json?.criteria && (
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-700 mb-3">Đánh giá theo tiêu chí</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      {Object.entries(grade.feedback_json.criteria).map(([key, val]) => {
+                        const labelMap = {
+                          correctness: 'Tính đúng đắn',
+                          clarity: 'Rõ ràng',
+                          efficiency: 'Hiệu quả',
+                        };
+                        return (
+                          <div key={key} className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-xs font-semibold text-gray-600 uppercase">{labelMap[key] || key}</span>
+                              <span className="text-sm font-bold text-gray-900">{val.score}/10</span>
+                            </div>
+                            <p className="text-xs text-gray-600">{val.comment}</p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* LLM cost (teacher only) */}
+                {user?.role === 'teacher' && grade.llm_cost > 0 && (
+                  <p className="text-xs text-gray-400 text-right">
+                    Chi phí AI: ~${(grade.llm_cost * 1000).toFixed(4)} per 1000 lần
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Student already submitted */}
+          {user?.role === 'student' && assignment.status !== 'pending' && !submission && (
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center text-gray-600 text-sm">
+              Đang tải thông tin bài nộp...
+            </div>
+          )}
         </div>
       </main>
     </div>

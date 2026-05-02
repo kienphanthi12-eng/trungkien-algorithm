@@ -1,10 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api.endpoints import auth, students, problems, assignments
+from app.api.endpoints import auth, students, problems, assignments, submissions
 
 import os
 
-app = FastAPI(title="TrungKien Algorithm API", version="1.0.0")
+app = FastAPI(title="TrungKien Algorithm API", version="1.5.0")
 
 # CORS config - Allow all origins for Phase 1 to avoid "Failed to fetch" errors
 app.add_middleware(
@@ -19,7 +19,8 @@ app.include_router(auth.router, prefix="/auth", tags=["Auth"])
 app.include_router(students.router, prefix="/students", tags=["Students"])
 app.include_router(problems.router, prefix="/problems", tags=["Problems"])
 app.include_router(assignments.router, prefix="/assignments", tags=["Assignments"])
+app.include_router(submissions.router, prefix="/submissions", tags=["Submissions"])
 
 @app.get("/")
 def read_root():
-    return {"message": "Welcome to TrungKien Algorithm API Phase 4"}
+    return {"message": "Welcome to TrungKien Algorithm API Phase 5"}

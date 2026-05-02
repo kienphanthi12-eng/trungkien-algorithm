@@ -238,3 +238,57 @@ export async function deleteProblem(token, problemId) {
   }
   return response.json();
 }
+
+// Submission API functions
+export async function createSubmission(token, { assignment_id, text_content, image_urls }) {
+  const response = await fetch(`${API_BASE_URL}/submissions/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify({ assignment_id, text_content, image_urls: image_urls || [] }),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Lỗi khi nộp bài');
+  }
+  return response.json();
+}
+
+export async function getSubmissionByAssignment(token, assignmentId) {
+  const response = await fetch(`${API_BASE_URL}/submissions/by-assignment/${assignmentId}`, {
+    method: 'GET',
+    headers: { 'Authorization': `Bearer ${token}` },
+  });
+  if (response.status === 404) return null;
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Lỗi khi tải bài nộp');
+  }
+  return response.json();
+}
+
+export async function getSubmission(token, submissionId) {
+  const response = await fetch(`${API_BASE_URL}/submissions/${submissionId}`, {
+    method: 'GET',
+    headers: { 'Authorization': `Bearer ${token}` },
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Lỗi khi tải bài nộp');
+  }
+  return response.json();
+}
+
+export async function gradeSubmission(token, submissionId) {
+  const response = await fetch(`${API_BASE_URL}/submissions/${submissionId}/grade`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}` },
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Lỗi khi chấm bài');
+  }
+  return response.json();
+}
