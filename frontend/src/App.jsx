@@ -5,6 +5,9 @@ import Login from './pages/Login'
 import Register from './pages/Register'
 import Dashboard from './pages/Dashboard'
 import Students from './pages/Students'
+import Problems from './pages/Problems'
+import ProblemDetail from './pages/ProblemDetail'
+import CreateProblem from './pages/CreateProblem'
 
 function App() {
   return (
@@ -13,21 +16,53 @@ function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
-          <Route 
-            path="/" 
+          <Route
+            path="/"
             element={
               <ProtectedRoute>
                 <Dashboard />
               </ProtectedRoute>
-            } 
+            }
           />
-          <Route 
-            path="/students" 
+          <Route
+            path="/students"
             element={
               <ProtectedRoute>
                 <Students />
               </ProtectedRoute>
-            } 
+            }
+          />
+          <Route
+            path="/problems"
+            element={
+              <ProtectedRoute>
+                <Problems />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/problems/create"
+            element={
+              <ProtectedRoute>
+                <CreateProblem />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/problems/:problemId"
+            element={
+              <ProtectedRoute>
+                <ProblemDetail />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/problems/:problemId/edit"
+            element={
+              <ProtectedRoute>
+                <CreateProblem />
+              </ProtectedRoute>
+            }
           />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

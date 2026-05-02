@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api.endpoints import auth, students
+from app.api.endpoints import auth, students, problems
 
 import os
 
@@ -17,7 +17,8 @@ app.add_middleware(
 
 app.include_router(auth.router, prefix="/auth", tags=["Auth"])
 app.include_router(students.router, prefix="/students", tags=["Students"])
+app.include_router(problems.router, prefix="/problems", tags=["Problems"])
 
 @app.get("/")
 def read_root():
-    return {"message": "Welcome to TrungKien Algorithm API Phase 1"}
+    return {"message": "Welcome to TrungKien Algorithm API Phase 3"}
