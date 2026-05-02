@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { getProblem } from '../services/api';
+import { getProblem, getStudents, createAssignment } from '../services/api';
 
 export default function ProblemDetail() {
   const { user, token, logoutUser } = useAuth();
@@ -10,6 +10,15 @@ export default function ProblemDetail() {
   const [problem, setProblem] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  // Assign modal state
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [students, setStudents] = useState([]);
+  const [selectedStudent, setSelectedStudent] = useState('');
+  const [dueDate, setDueDate] = useState('');
+  const [assigning, setAssigning] = useState(false);
+  const [assignError, setAssignError] = useState('');
+  const [assignSuccess, setAssignSuccess] = useState(false);
 
   useEffect(() => {
     fetchProblem();
@@ -28,16 +37,51 @@ export default function ProblemDetail() {
     }
   };
 
+  const openAssignModal = async () => {
+    setShowAssignModal(true);
+    setAssignError('');
+    setAssignSuccess(false);
+    setSelectedStudent('');
+    setDueDate('');
+    try {
+      const data = await getStudents(token);
+      setStudents(data);
+    } catch {
+      setStudents([]);
+    }
+  };
+
+  const handleAssign = async () => {
+    if (!selectedStudent) {
+      setAssignError('Vui lòng chọn học sinh.');
+      return;
+    }
+    setAssigning(true);
+    setAssignError('');
+    try {
+      await createAssignment(token, {
+        problem_id: problem.id,
+        student_id: selectedStudent,
+        due_date: dueDate ? new Date(dueDate).toISOString() : null,
+      });
+      setAssignSuccess(true);
+      setTimeout(() => {
+        setShowAssignModal(false);
+        setAssignSuccess(false);
+      }, 1500);
+    } catch (err) {
+      setAssignError(err.message);
+    } finally {
+      setAssigning(false);
+    }
+  };
+
   const getDifficultyColor = (diff) => {
     switch (diff) {
-      case 'easy':
-        return 'bg-green-100 text-green-800';
-      case 'medium':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'hard':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
+      case 'easy': return 'bg-green-100 text-green-800';
+      case 'medium': return 'bg-yellow-100 text-yellow-800';
+      case 'hard': return 'bg-red-100 text-red-800';
+      default: return 'bg-gray-100 text-gray-800';
     }
   };
 
@@ -69,10 +113,13 @@ export default function ProblemDetail() {
           <div className="flex justify-between h-16 items-center">
             <div className="flex items-center">
               <Link to="/" className="text-xl font-bold text-blue-600 mr-8">TrungKien Algorithm</Link>
-              <div className="hidden md:block">
+              <div className="hidden md:flex">
                 <Link to="/" className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">Dashboard</Link>
-                <Link to="/students" className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">Học sinh</Link>
+                {user?.role === 'teacher' && (
+                  <Link to="/students" className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">Học sinh</Link>
+                )}
                 <Link to="/problems" className="text-blue-600 border-b-2 border-blue-600 px-3 py-2 rounded-md text-sm font-medium">Bài toán</Link>
+                <Link to="/assignments" className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">Bài tập</Link>
               </div>
             </div>
             <div className="flex items-center space-x-4">
@@ -99,8 +146,18 @@ export default function ProblemDetail() {
           <div className="bg-white shadow rounded-lg p-6">
             {/* Title and Info */}
             <div className="mb-6">
-              <h1 className="text-3xl font-bold text-gray-900 mb-4">{problem.title}</h1>
-              <div className="flex flex-wrap gap-2 mb-4">
+              <div className="flex items-start justify-between gap-4">
+                <h1 className="text-3xl font-bold text-gray-900">{problem.title}</h1>
+                {user?.role === 'teacher' && (
+                  <button
+                    onClick={openAssignModal}
+                    className="flex-shrink-0 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-sm font-medium"
+                  >
+                    📋 Giao bài
+                  </button>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-2 mt-4">
                 <span className={`inline-block px-3 py-1 text-sm font-medium rounded ${getDifficultyColor(problem.difficulty)}`}>
                   {problem.difficulty === 'easy' ? 'Dễ' : problem.difficulty === 'medium' ? 'Trung bình' : 'Khó'}
                 </span>
@@ -167,7 +224,7 @@ export default function ProblemDetail() {
               </div>
             </div>
 
-            {/* Action Buttons */}
+            {/* Teacher action buttons */}
             {user?.role === 'teacher' && problem.created_by === user.id && (
               <div className="flex gap-2">
                 <Link
@@ -182,13 +239,87 @@ export default function ProblemDetail() {
             {user?.role === 'student' && (
               <div className="bg-blue-50 border border-blue-200 rounded p-4">
                 <p className="text-sm text-blue-700">
-                  ℹ️ Để nộp bài làm, bạn cần chờ đến Phase 4 (Assignment Flow)
+                  ℹ️ Để nộp bài làm, bạn cần được giáo viên giao bài tập. Kiểm tra{' '}
+                  <Link to="/assignments" className="underline font-medium">trang Bài tập</Link> của bạn.
                 </p>
               </div>
             )}
           </div>
         </div>
       </main>
+
+      {/* Assign Modal */}
+      {showAssignModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900">Giao bài toán</h3>
+              <button onClick={() => setShowAssignModal(false)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
+            </div>
+
+            <div className="px-6 py-4 space-y-4">
+              <div className="bg-gray-50 rounded p-3 text-sm text-gray-700">
+                <span className="font-medium">Bài toán:</span> {problem.title}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Học sinh <span className="text-red-500">*</span>
+                </label>
+                {students.length === 0 ? (
+                  <p className="text-sm text-gray-500 italic">Bạn chưa có học sinh nào trong lớp.</p>
+                ) : (
+                  <select
+                    value={selectedStudent}
+                    onChange={(e) => setSelectedStudent(e.target.value)}
+                    className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
+                  >
+                    <option value="">— Chọn học sinh —</option>
+                    {students.map((s) => (
+                      <option key={s.id} value={s.id}>{s.name} ({s.email})</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Hạn nộp (tuỳ chọn)</label>
+                <input
+                  type="datetime-local"
+                  value={dueDate}
+                  onChange={(e) => setDueDate(e.target.value)}
+                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
+                />
+              </div>
+
+              {assignError && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">{assignError}</div>
+              )}
+              {assignSuccess && (
+                <div className="p-3 bg-green-50 border border-green-200 rounded text-green-700 text-sm">
+                  ✅ Đã giao bài thành công!
+                </div>
+              )}
+            </div>
+
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
+              <button
+                onClick={() => setShowAssignModal(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+              >
+                Huỷ
+              </button>
+              <button
+                onClick={handleAssign}
+                disabled={assigning || assignSuccess || students.length === 0}
+                className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50 transition-colors"
+              >
+                {assigning ? 'Đang giao...' : 'Xác nhận giao bài'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -167,6 +167,64 @@ export async function updateProblem(token, problemId, problemData) {
   return response.json();
 }
 
+// Assignment API functions
+export async function getAssignments(token, { studentId, status, skip = 0, limit = 20 } = {}) {
+  let url = `${API_BASE_URL}/assignments/?skip=${skip}&limit=${limit}`;
+  if (studentId) url += `&student_id=${studentId}`;
+  if (status) url += `&status=${status}`;
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: { 'Authorization': `Bearer ${token}` },
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Lỗi khi tải danh sách bài tập');
+  }
+  return response.json();
+}
+
+export async function getAssignment(token, assignmentId) {
+  const response = await fetch(`${API_BASE_URL}/assignments/${assignmentId}`, {
+    method: 'GET',
+    headers: { 'Authorization': `Bearer ${token}` },
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Lỗi khi tải bài tập');
+  }
+  return response.json();
+}
+
+export async function createAssignment(token, { student_id, problem_id, due_date }) {
+  const body = { student_id, problem_id };
+  if (due_date) body.due_date = due_date;
+  const response = await fetch(`${API_BASE_URL}/assignments/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Lỗi khi tạo bài tập');
+  }
+  return response.json();
+}
+
+export async function deleteAssignment(token, assignmentId) {
+  const response = await fetch(`${API_BASE_URL}/assignments/${assignmentId}`, {
+    method: 'DELETE',
+    headers: { 'Authorization': `Bearer ${token}` },
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Lỗi khi xóa bài tập');
+  }
+  return response.json();
+}
+
 export async function deleteProblem(token, problemId) {
   const response = await fetch(`${API_BASE_URL}/problems/${problemId}`, {
     method: 'DELETE',

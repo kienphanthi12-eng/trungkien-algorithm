@@ -72,10 +72,26 @@ export default function Dashboard() {
               </p>
             </Link>
 
-            <div className="p-6 bg-white rounded-lg border border-gray-200 shadow-md">
-              <h5 className="mb-2 text-xl font-bold tracking-tight text-gray-900">Thông báo</h5>
-              <p className="font-normal text-gray-700">Phase 3: Quản lý bài toán đã được triển khai. Giáo viên có thể tạo bài toán mới.</p>
-            </div>
+            <Link
+              to="/assignments"
+              className="block p-6 bg-white rounded-lg border border-gray-200 shadow-md hover:bg-gray-50 transition-colors"
+            >
+              <div className="flex items-center mb-2">
+                <div className="p-2 bg-yellow-100 rounded-lg text-yellow-600 mr-3">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                  </svg>
+                </div>
+                <h5 className="text-xl font-bold tracking-tight text-gray-900">
+                  {user?.role === 'teacher' ? 'Bài tập đã giao' : 'Bài tập của tôi'}
+                </h5>
+              </div>
+              <p className="font-normal text-gray-700">
+                {user?.role === 'teacher'
+                  ? 'Xem và quản lý bài tập đã giao cho học sinh.'
+                  : 'Xem bài tập được giao và trạng thái nộp bài.'}
+              </p>
+            </Link>
           </div>
         </div>
       </main>

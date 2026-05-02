@@ -8,6 +8,8 @@ import Students from './pages/Students'
 import Problems from './pages/Problems'
 import ProblemDetail from './pages/ProblemDetail'
 import CreateProblem from './pages/CreateProblem'
+import Assignments from './pages/Assignments'
+import AssignmentDetail from './pages/AssignmentDetail'
 
 function App() {
   return (
@@ -61,6 +63,22 @@ function App() {
             element={
               <ProtectedRoute>
                 <CreateProblem />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/assignments"
+            element={
+              <ProtectedRoute>
+                <Assignments />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/assignments/:assignmentId"
+            element={
+              <ProtectedRoute>
+                <AssignmentDetail />
               </ProtectedRoute>
             }
           />
