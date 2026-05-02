@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { createProblem, updateProblem, getProblem } from '../services/api';
+import { createProblem, updateProblem, getProblem, generateProblem } from '../services/api';
 
 export default function CreateProblem() {
   const { user, token, logoutUser } = useAuth();
@@ -24,6 +24,12 @@ export default function CreateProblem() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+
+  // AI generation state
+  const [showAiModal, setShowAiModal] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState('');
 
   useEffect(() => {
     if (isEdit) {
@@ -83,6 +89,37 @@ export default function CreateProblem() {
       ...prev,
       test_cases: prev.test_cases.filter((_, i) => i !== index)
     }));
+  };
+
+  const handleAiGenerate = async () => {
+    if (!aiPrompt.trim()) {
+      setAiError('Vui lòng nhập mô tả ý tưởng bài toán.');
+      return;
+    }
+    setAiError('');
+    setAiLoading(true);
+    try {
+      const data = await generateProblem(token, aiPrompt);
+      setFormData({
+        title: data.title || '',
+        description: data.description || '',
+        difficulty: data.difficulty || 'medium',
+        category: data.category || '',
+        example_input: data.example_input || '',
+        example_output: data.example_output || '',
+        test_cases: Array.isArray(data.test_cases) && data.test_cases.length > 0
+          ? data.test_cases
+          : [{ input: '', output: '' }],
+        time_limit: data.time_limit || 1000,
+        memory_limit: data.memory_limit || 256,
+      });
+      setShowAiModal(false);
+      setAiPrompt('');
+    } catch (err) {
+      setAiError(err.message);
+    } finally {
+      setAiLoading(false);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -158,9 +195,21 @@ export default function CreateProblem() {
           </Link>
 
           <div className="bg-white shadow rounded-lg p-6">
-            <h1 className="text-3xl font-bold text-gray-900 mb-6">
-              {isEdit ? 'Chỉnh sửa bài toán' : 'Tạo bài toán mới'}
-            </h1>
+            <div className="flex items-center justify-between mb-6">
+              <h1 className="text-3xl font-bold text-gray-900">
+                {isEdit ? 'Chỉnh sửa bài toán' : 'Tạo bài toán mới'}
+              </h1>
+              {!isEdit && (
+                <button
+                  type="button"
+                  onClick={() => { setShowAiModal(true); setAiError(''); }}
+                  className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium text-sm shadow"
+                >
+                  <span>✨</span>
+                  <span>Tạo đề bằng AI</span>
+                </button>
+              )}
+            </div>
 
             {error && (
               <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
@@ -362,6 +411,78 @@ export default function CreateProblem() {
           </div>
         </div>
       </main>
+
+      {/* AI Generation Modal */}
+      {showAiModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <span className="text-2xl">✨</span>
+              <h2 className="text-xl font-bold text-gray-900">Tạo đề bài bằng AI</h2>
+            </div>
+
+            <p className="text-sm text-gray-600 mb-4">
+              Mô tả ngắn gọn ý tưởng bài toán, AI sẽ tự động sinh đầy đủ nội dung cho bạn.
+            </p>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Ý tưởng bài toán
+              </label>
+              <textarea
+                value={aiPrompt}
+                onChange={(e) => setAiPrompt(e.target.value)}
+                rows="4"
+                disabled={aiLoading}
+                className="w-full rounded-lg border border-gray-300 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
+                placeholder="VD: Bài toán tìm tổng lớn nhất của dãy con liên tiếp (Kadane's algorithm), độ khó trung bình&#10;&#10;VD: Bài đếm số đảo ngược trong mảng bằng merge sort, khó&#10;&#10;VD: Bài kiểm tra số nguyên tố đơn giản cho người mới"
+              />
+            </div>
+
+            {aiError && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+                {aiError}
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={handleAiGenerate}
+                disabled={aiLoading}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium disabled:opacity-50"
+              >
+                {aiLoading ? (
+                  <>
+                    <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span>Đang tạo...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>✨</span>
+                    <span>Tạo bài toán</span>
+                  </>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setShowAiModal(false); setAiPrompt(''); setAiError(''); }}
+                disabled={aiLoading}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium disabled:opacity-50"
+              >
+                Hủy
+              </button>
+            </div>
+
+            <p className="mt-3 text-xs text-gray-400 text-center">
+              Sử dụng DeepSeek AI · Có thể mất 10–20 giây
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

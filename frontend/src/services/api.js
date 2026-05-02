@@ -113,6 +113,22 @@ export async function removeStudent(token, studentId) {
 }
 
 // Problem API functions
+export async function generateProblem(token, prompt) {
+  const response = await fetch(`${API_BASE_URL}/problems/generate`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify({ prompt }),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Lỗi khi tạo bài toán bằng AI');
+  }
+  return response.json();
+}
+
 export async function getProblems(token, skip = 0, limit = 10, difficulty = null, category = null) {
   let url = `${API_BASE_URL}/problems/?skip=${skip}&limit=${limit}`;
   if (difficulty) url += `&difficulty=${difficulty}`;
