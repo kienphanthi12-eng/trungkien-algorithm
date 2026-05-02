@@ -45,7 +45,6 @@ export default function Problems() {
     }
   };
 
-  // Reset về trang 1 khi đổi filter — useEffect sẽ tự fetch lại
   const handleDifficultyChange = (e) => {
     setDifficulty(e.target.value);
     setCurrentPage(1);
@@ -242,16 +241,6 @@ export default function Problems() {
                     >
                       Sau
                     </button>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        </div>
-      </main>
-    </div>
-  );
-}
                   </div>
                 )}
               </>
