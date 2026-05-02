@@ -79,21 +79,7 @@ def _enrich_submission(sub: dict) -> dict:
     return enriched
 
 
-def _call_llm_grader(problem_title: str, problem_description: str, answer_text: str) -> dict:
-    """
-    Call Anthropic Claude to grade a submission.
-    Returns: {"score": float, "feedback_json": dict, "llm_cost": float}
-    """
-    try:
-        import anthropic
-
-        api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-        if not api_key:
-            raise ValueError("ANTHROPIC_API_KEY not configured")
-
-        client = anthropic.Anthropic(api_key=api_key)
-
-        system_prompt = """Bạn là một giáo viên lập trình chấm bài tập của học sinh.
+GRADING_SYSTEM_PROMPT = """Bạn là một giáo viên lập trình chấm bài tập của học sinh.
 Hãy chấm bài dựa trên đề bài và bài làm của học sinh.
 Trả về JSON với format chính xác như sau (không có text nào khác):
 {
@@ -106,7 +92,9 @@ Trả về JSON với format chính xác như sau (không có text nào khác):
   }
 }"""
 
-        user_msg = f"""ĐỀ BÀI: {problem_title}
+
+def _build_grading_user_msg(problem_title: str, problem_description: str, answer_text: str) -> str:
+    return f"""ĐỀ BÀI: {problem_title}
 
 MÔ TẢ: {problem_description}
 
@@ -115,52 +103,127 @@ BÀI LÀM CỦA HỌC SINH:
 
 Hãy chấm bài và trả về JSON theo format đã chỉ định."""
 
-        message = client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=1024,
-            messages=[{"role": "user", "content": user_msg}],
-            system=system_prompt,
-        )
 
-        response_text = message.content[0].text.strip()
+def _parse_grading_response(response_text: str) -> dict:
+    json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
+    if json_match:
+        feedback = json.loads(json_match.group())
+    else:
+        feedback = json.loads(response_text)
+    score = float(feedback.get("score", 0))
+    feedback["score"] = max(0.0, min(10.0, score))
+    return feedback
 
-        # Extract JSON from response
-        json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
-        if json_match:
-            feedback = json.loads(json_match.group())
-        else:
-            feedback = json.loads(response_text)
 
-        score = float(feedback.get("score", 0))
-        score = max(0.0, min(10.0, score))
+def _grade_with_deepseek(problem_title: str, problem_description: str, answer_text: str) -> dict:
+    """Call DeepSeek API (OpenAI-compatible). Cheapest option."""
+    import httpx
 
-        # Estimate cost (Haiku: ~$0.25/MTok input, $1.25/MTok output)
-        input_tokens = message.usage.input_tokens
-        output_tokens = message.usage.output_tokens
-        llm_cost = (input_tokens * 0.00000025) + (output_tokens * 0.00000125)
+    api_key = os.environ.get("DEEPSEEK_API_KEY", "")
+    if not api_key:
+        raise ValueError("DEEPSEEK_API_KEY not configured")
 
-        return {"score": score, "feedback_json": feedback, "llm_cost": llm_cost}
+    user_msg = _build_grading_user_msg(problem_title, problem_description, answer_text)
 
-    except ImportError:
-        # Fallback if anthropic package not installed
-        return {
+    resp = httpx.post(
+        "https://api.deepseek.com/chat/completions",
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+        json={
+            "model": "deepseek-chat",
+            "messages": [
+                {"role": "system", "content": GRADING_SYSTEM_PROMPT},
+                {"role": "user", "content": user_msg},
+            ],
+            "max_tokens": 1024,
+            "temperature": 0.2,
+        },
+        timeout=60.0,
+    )
+    resp.raise_for_status()
+    data = resp.json()
+
+    response_text = data["choices"][0]["message"]["content"].strip()
+    feedback = _parse_grading_response(response_text)
+
+    # DeepSeek pricing: ~$0.14/MTok input, $0.28/MTok output (deepseek-chat)
+    usage = data.get("usage", {})
+    input_tokens = usage.get("prompt_tokens", 0)
+    output_tokens = usage.get("completion_tokens", 0)
+    llm_cost = (input_tokens * 0.00000014) + (output_tokens * 0.00000028)
+
+    return {"score": feedback["score"], "feedback_json": feedback, "llm_cost": llm_cost, "model": "deepseek-chat"}
+
+
+def _grade_with_anthropic(problem_title: str, problem_description: str, answer_text: str) -> dict:
+    """Call Anthropic Claude Haiku. Fallback option."""
+    import anthropic
+
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if not api_key:
+        raise ValueError("ANTHROPIC_API_KEY not configured")
+
+    client = anthropic.Anthropic(api_key=api_key)
+    user_msg = _build_grading_user_msg(problem_title, problem_description, answer_text)
+
+    message = client.messages.create(
+        model="claude-haiku-4-5-20251001",
+        max_tokens=1024,
+        messages=[{"role": "user", "content": user_msg}],
+        system=GRADING_SYSTEM_PROMPT,
+    )
+
+    response_text = message.content[0].text.strip()
+    feedback = _parse_grading_response(response_text)
+
+    # Haiku pricing: $0.80/MTok input, $4.00/MTok output (claude-haiku-4-5)
+    input_tokens = message.usage.input_tokens
+    output_tokens = message.usage.output_tokens
+    llm_cost = (input_tokens * 0.0000008) + (output_tokens * 0.000004)
+
+    return {"score": feedback["score"], "feedback_json": feedback, "llm_cost": llm_cost, "model": "claude-haiku-4-5"}
+
+
+def _call_llm_grader(problem_title: str, problem_description: str, answer_text: str) -> dict:
+    """
+    Grade with DeepSeek first (cheaper), fallback to Anthropic.
+    Returns: {"score": float, "feedback_json": dict, "llm_cost": float}
+    """
+    last_error = None
+
+    # 1. Try DeepSeek first (cheapest)
+    deepseek_key = os.environ.get("DEEPSEEK_API_KEY", "")
+    if deepseek_key:
+        try:
+            return _grade_with_deepseek(problem_title, problem_description, answer_text)
+        except Exception as e:
+            last_error = e
+
+    # 2. Fallback to Anthropic
+    anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if anthropic_key:
+        try:
+            return _grade_with_anthropic(problem_title, problem_description, answer_text)
+        except Exception as e:
+            last_error = e
+
+    # 3. No API keys configured — return placeholder
+    if last_error:
+        raise last_error
+
+    return {
+        "score": 5.0,
+        "feedback_json": {
             "score": 5.0,
-            "feedback_json": {
-                "score": 5.0,
-                "overall": "Chấm tự động không khả dụng. Giáo viên vui lòng chấm thủ công.",
-                "criteria": {
-                    "correctness": {"score": 5, "comment": "Chưa đánh giá"},
-                    "clarity": {"score": 5, "comment": "Chưa đánh giá"},
-                    "efficiency": {"score": 5, "comment": "Chưa đánh giá"},
-                },
+            "overall": "Chưa cấu hình API key. Vui lòng thêm DEEPSEEK_API_KEY hoặc ANTHROPIC_API_KEY vào Railway.",
+            "criteria": {
+                "correctness": {"score": 5, "comment": "Chưa đánh giá"},
+                "clarity": {"score": 5, "comment": "Chưa đánh giá"},
+                "efficiency": {"score": 5, "comment": "Chưa đánh giá"},
             },
-            "llm_cost": 0.0,
-        }
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Lỗi khi chấm bài: {str(e)}",
-        )
+        },
+        "llm_cost": 0.0,
+        "model": "none",
+    }
 
 
 # ─── Endpoints ─────────────────────────────────────────────────────────────────

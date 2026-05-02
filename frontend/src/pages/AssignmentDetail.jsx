@@ -383,10 +383,15 @@ export default function AssignmentDetail() {
                   </div>
                 )}
 
-                {/* LLM cost (teacher only) */}
-                {user?.role === 'teacher' && grade.llm_cost > 0 && (
+                {/* LLM cost + model (teacher only) */}
+                {user?.role === 'teacher' && (
                   <p className="text-xs text-gray-400 text-right">
-                    Chi phí AI: ~${(grade.llm_cost * 1000).toFixed(4)} per 1000 lần
+                    {grade.feedback_json?.model && (
+                      <span className="mr-3 px-2 py-0.5 bg-gray-100 rounded text-gray-500">
+                        {grade.feedback_json.model === 'deepseek-chat' ? '🔵 DeepSeek' : '🟣 Claude Haiku'}
+                      </span>
+                    )}
+                    {grade.llm_cost > 0 && `Chi phí: $${grade.llm_cost.toFixed(6)}`}
                   </p>
                 )}
               </div>
