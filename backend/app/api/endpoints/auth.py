@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from app.schemas.auth import UserRegister, UserLogin, TokenResponse
+from app.schemas.auth import UserRegister, UserLogin, TokenResponse, RefreshRequest, RefreshResponse
 from app.services.supabase_client import supabase_client, get_supabase
 from app.api.dependencies import get_current_user
 
@@ -65,6 +65,7 @@ def login(user_data: UserLogin):
 
         return TokenResponse(
             access_token=auth_response.session.access_token,
+            refresh_token=auth_response.session.refresh_token or "",
             user={
                 "id": str(auth_response.user.id),
                 "email": auth_response.user.email,
@@ -91,7 +92,7 @@ def get_me(current_user = Depends(get_current_user)):
 
         print(f"Response data: {db_response.data}")
 
-        if not db_response.data or len(db_response.data) == 0:
+        if not db_response.data or len(db_response.data) == 0:  # noqa: E501
             print(f"Profile for {current_user.email} missing. Attempting auto-create...")
             user_metadata = getattr(current_user, 'user_metadata', {}) or {}
 
@@ -127,3 +128,23 @@ def get_me(current_user = Depends(get_current_user)):
     except Exception as e:
         print(f"Exception caught: {type(e)} - {str(e)}")
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+
+@router.post("/refresh", response_model=RefreshResponse)
+def refresh_token(body: RefreshRequest):
+    """Exchange a refresh_token for a new access_token + refresh_token pair."""
+    try:
+        auth_client = get_supabase()
+        resp = auth_client.auth.refresh_session(body.refresh_token)
+
+        if not resp.session:
+            raise HTTPException(status_code=401, detail="Refresh token không hợp lệ hoặc đã hết hạn. Vui lòng đăng nhập lại.")
+
+        return RefreshResponse(
+            access_token=resp.session.access_token,
+            refresh_token=resp.session.refresh_token or body.refresh_token,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=401, detail="Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.")

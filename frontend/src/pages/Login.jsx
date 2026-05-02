@@ -23,10 +23,9 @@ export default function Login() {
       // Step 2: fetch full profile — if this fails, still log in with basic data
       try {
         const fullUser = await getMe(data.access_token);
-        loginUser(data.access_token, fullUser);
+        loginUser(data.access_token, fullUser, data.refresh_token);
       } catch (profileErr) {
-        // Login succeeded but profile lookup failed — proceed with minimal user data
-        loginUser(data.access_token, data.user);
+        loginUser(data.access_token, data.user, data.refresh_token);
       }
 
       navigate('/');

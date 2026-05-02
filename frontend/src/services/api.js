@@ -1,6 +1,16 @@
 // Backend URL updated to Railway production
 const API_BASE_URL = 'https://trungkien-algorithm-production.up.railway.app';
 
+export async function refreshToken(refresh_token) {
+  const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ refresh_token }),
+  });
+  if (!response.ok) throw new Error('Refresh failed');
+  return response.json(); // { access_token, refresh_token }
+}
+
 export async function login(email, password) {
   const response = await fetch(`${API_BASE_URL}/auth/login`, {
     method: 'POST',
