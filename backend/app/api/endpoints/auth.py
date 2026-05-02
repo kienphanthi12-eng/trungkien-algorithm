@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from app.schemas.auth import UserRegister, UserLogin, TokenResponse
-from app.services.supabase_client import supabase_client
+from app.services.supabase_client import supabase_client, get_supabase
 from app.api.dependencies import get_current_user
 
 router = APIRouter()
@@ -53,7 +53,9 @@ def register(user_data: UserRegister):
 @router.post("/login", response_model=TokenResponse)
 def login(user_data: UserLogin):
     try:
-        auth_response = supabase_client.auth.sign_in_with_password({
+        # Use a fresh client so sign_in doesn't overwrite the shared admin client's service-role session
+        auth_client = get_supabase()
+        auth_response = auth_client.auth.sign_in_with_password({
             "email": user_data.email,
             "password": user_data.password
         })
