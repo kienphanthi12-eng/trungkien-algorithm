@@ -1,4 +1,5 @@
 import { useAuth } from '../contexts/AuthContext';
+import { Link } from 'react-router-dom';
 
 export default function Dashboard() {
   const { user, logoutUser } = useAuth();
@@ -31,10 +32,11 @@ export default function Dashboard() {
 
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
+          <h2 className="text-2xl font-bold text-gray-900 mb-6">Bảng điều khiển</h2>
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {user?.role === 'teacher' && (
-              <a 
-                href="/students"
+              <Link
+                to="/students"
                 className="block p-6 bg-white rounded-lg border border-gray-200 shadow-md hover:bg-gray-50 transition-colors"
               >
                 <div className="flex items-center mb-2">
@@ -46,12 +48,33 @@ export default function Dashboard() {
                   <h5 className="text-xl font-bold tracking-tight text-gray-900">Quản lý học sinh</h5>
                 </div>
                 <p className="font-normal text-gray-700">Xem danh sách, thêm hoặc xóa học sinh trong lớp của bạn.</p>
-              </a>
+              </Link>
             )}
-            
+
+            <Link
+              to="/problems"
+              className="block p-6 bg-white rounded-lg border border-gray-200 shadow-md hover:bg-gray-50 transition-colors"
+            >
+              <div className="flex items-center mb-2">
+                <div className="p-2 bg-green-100 rounded-lg text-green-600 mr-3">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <h5 className="text-xl font-bold tracking-tight text-gray-900">
+                  {user?.role === 'teacher' ? 'Quản lý bài toán' : 'Kho bài toán'}
+                </h5>
+              </div>
+              <p className="font-normal text-gray-700">
+                {user?.role === 'teacher'
+                  ? 'Tạo, chỉnh sửa hoặc xóa bài toán'
+                  : 'Xem danh sách bài toán và chi tiết bài toán'}
+              </p>
+            </Link>
+
             <div className="p-6 bg-white rounded-lg border border-gray-200 shadow-md">
               <h5 className="mb-2 text-xl font-bold tracking-tight text-gray-900">Thông báo</h5>
-              <p className="font-normal text-gray-700">Phase 2: Quản lý học sinh đã được triển khai. Bạn có thể bắt đầu thêm học sinh của mình.</p>
+              <p className="font-normal text-gray-700">Phase 3: Quản lý bài toán đã được triển khai. Giáo viên có thể tạo bài toán mới.</p>
             </div>
           </div>
         </div>
