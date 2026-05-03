@@ -8,6 +8,10 @@ from app.schemas.exams import Exam, ExamCreate, ExamUpdate, ExamList
 
 router = APIRouter()
 
+@router.get("/health")
+def health_check():
+    return {"status": "ok", "module": "exams"}
+
 @router.get("/", response_model=ExamList)
 def get_exams(
     skip: int = Query(0, ge=0),
