@@ -414,3 +414,33 @@ export async function gradeSubmission(token, submissionId) {
   }
   return response.json();
 }
+
+// AI Exam Analyzer — Phase 7 Stage 2
+export async function analyzeExam(token, file) {
+  const formData = new FormData();
+  formData.append('file', file);
+  const response = await fetch(`${API_BASE_URL}/exams/analyze`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}` },
+    body: formData,
+  });
+  if (!response.ok) {
+    throw new Error(await _parseError(response, 'Lỗi khi phân tích đề thi'));
+  }
+  return response.json(); // { questions: [...], count: N }
+}
+
+export async function createExamFromQuestions(token, { title, description, duration, questions }) {
+  const response = await fetch(`${API_BASE_URL}/exams/create-from-questions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify({ title, description, duration, questions }),
+  });
+  if (!response.ok) {
+    throw new Error(await _parseError(response, 'Lỗi khi tạo đề thi từ câu hỏi'));
+  }
+  return response.json();
+}

@@ -12,6 +12,7 @@ import Assignments from './pages/Assignments'
 import AssignmentDetail from './pages/AssignmentDetail'
 import Exams from './pages/Exams'
 import CreateExam from './pages/CreateExam'
+import AnalyzeExam from './pages/AnalyzeExam'
 
 function App() {
   return (
@@ -81,6 +82,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <CreateExam />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/exams/analyze"
+            element={
+              <ProtectedRoute>
+                <AnalyzeExam />
               </ProtectedRoute>
             }
           />

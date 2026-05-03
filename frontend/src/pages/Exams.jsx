@@ -109,9 +109,14 @@ export default function Exams() {
             </div>
             <div className="flex items-center gap-4">
               {user?.role === 'teacher' && (
-                <Link to="/exams/create" className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-sm font-bold rounded-xl shadow-lg shadow-blue-200 hover:scale-105 transition-all">
-                  + Tạo đề thi mới
-                </Link>
+                <>
+                  <Link to="/exams/analyze" className="px-5 py-2.5 bg-white border border-purple-200 text-purple-700 text-sm font-bold rounded-xl hover:bg-purple-50 transition-all shadow-sm">
+                    ✨ AI Phân tích đề
+                  </Link>
+                  <Link to="/exams/create" className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-sm font-bold rounded-xl shadow-lg shadow-blue-200 hover:scale-105 transition-all">
+                    + Tạo đề thi mới
+                  </Link>
+                </>
               )}
               <button onClick={logoutUser} className="text-gray-500 hover:text-red-600 transition-colors">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
