@@ -10,6 +10,8 @@ import ProblemDetail from './pages/ProblemDetail'
 import CreateProblem from './pages/CreateProblem'
 import Assignments from './pages/Assignments'
 import AssignmentDetail from './pages/AssignmentDetail'
+import Exams from './pages/Exams'
+import CreateExam from './pages/CreateExam'
 
 function App() {
   return (
@@ -63,6 +65,22 @@ function App() {
             element={
               <ProtectedRoute>
                 <CreateProblem />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/exams"
+            element={
+              <ProtectedRoute>
+                <Exams />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/exams/create"
+            element={
+              <ProtectedRoute>
+                <CreateExam />
               </ProtectedRoute>
             }
           />

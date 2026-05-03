@@ -14,6 +14,43 @@ router = APIRouter()
 
 # ─── AI Problem Generation ────────────────────────────────────────────────────
 
+GENERATE_BULK_SYSTEM_PROMPT = """Bạn là chuyên gia ra đề thi và bậc thầy đố vui sáng tạo nhất Việt Nam. 
+Bạn có khả năng tạo ra hàng loạt các bài toán hoặc câu đố chất lượng cao theo yêu cầu.
+
+Yêu cầu cực kỳ quan trọng: TRẢ VỀ MỘT MẢNG JSON (JSON ARRAY) chứa các đối tượng bài toán.
+Ví dụ: [ {problem1}, {problem2}, ... ]
+
+Mỗi đối tượng trong mảng phải tuân thủ đúng cấu trúc sau tùy theo loại bài:
+
+Nếu là TRẮC NGHIỆM (multiple_choice hoặc trivia):
+{
+  "problem_type": "multiple_choice" | "trivia",
+  "title": "...",
+  "description": "...",
+  "difficulty": "easy" | "medium" | "hard",
+  "category": "...",
+  "choices": {"A": "...", "B": "...", "C": "...", "D": "..."},
+  "correct_answer": "A" | "B" | "C" | "D",
+  "solution": "..."
+}
+
+Nếu là ĐÚNG/SAI (true_false):
+{
+  "problem_type": "true_false",
+  "title": "...",
+  "description": "...",
+  "difficulty": "...",
+  "category": "...",
+  "correct_answer": "true" | "false",
+  "solution": "..."
+}
+
+QUY TẮC:
+- Trả về đúng số lượng câu hỏi được yêu cầu.
+- Không có markdown wrapper, chỉ trả về JSON thuần túy.
+- Nội dung phong phú, sáng tạo, không trùng lặp giữa các câu.
+"""
+
 GENERATE_SYSTEM_PROMPT = """Bạn là chuyên gia ra đề thi và bậc thầy đố vui sáng tạo nhất Việt Nam. 
 Bạn có khả năng tạo ra các bài toán lập trình hóc búa, bài toán phổ thông chuẩn xác và đặc biệt là các câu đố vui 'hại não', đố mẹo chơi chữ hoặc kiến thức độc lạ gây kinh ngạc.
 Từ ý tưởng ngắn gọn của giáo viên, hãy tạo một nội dung hoàn chỉnh, rõ ràng và có tính chuyên môn cao hoặc tính giải trí thông minh.
@@ -188,8 +225,43 @@ def _call_llm_generator_sync(prompt: str) -> dict:
     raise ValueError("Chưa cấu hình API key (DEEPSEEK_API_KEY hoặc ANTHROPIC_API_KEY).")
 
 
+def _generate_bulk_with_deepseek_sync(prompt: str, count: int) -> List[dict]:
+    import httpx
+    api_key = os.environ.get("DEEPSEEK_API_KEY", "")
+    resp = httpx.post(
+        "https://api.deepseek.com/chat/completions",
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+        json={
+            "model": "deepseek-chat",
+            "messages": [
+                {"role": "system", "content": GENERATE_BULK_SYSTEM_PROMPT},
+                {"role": "user", "content": f"Tạo {count} câu hỏi/bài toán về: {prompt}"},
+            ],
+            "temperature": 0.8,
+        },
+        timeout=120.0,
+    )
+    resp.raise_for_status()
+    content = resp.json()["choices"][0]["message"]["content"].strip()
+    if content.startswith("```"):
+        content = content.split("```")[1]
+        if content.startswith("json"): content = content[4:]
+    return json.loads(content.strip())
+
+
+def _call_llm_bulk_generator_sync(prompt: str, count: int) -> List[dict]:
+    if os.environ.get("DEEPSEEK_API_KEY"):
+        return _generate_bulk_with_deepseek_sync(prompt, count)
+    raise ValueError("Chưa cấu hình DEEPSEEK_API_KEY cho tính năng tạo hàng loạt.")
+
+
 class GenerateRequest(BaseModel):
     prompt: str
+
+
+class BulkGenerateRequest(BaseModel):
+    prompt: str
+    count: int = 5
 
 
 @router.post("/generate")
@@ -215,12 +287,33 @@ async def generate_problem(body: GenerateRequest, current_user = Depends(get_cur
         result.setdefault("correct_answer", None)
         result.setdefault("solution", None)
         return result
-    except HTTPException:
-        raise
-    except json.JSONDecodeError as e:
-        raise HTTPException(status_code=500, detail=f"AI trả về định dạng không hợp lệ: {str(e)}")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Lỗi khi tạo bài toán bằng AI: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Lỗi khi tạo bài toán: {str(e)}")
+
+
+@router.post("/generate-bulk")
+async def generate_problems_bulk(body: BulkGenerateRequest, current_user = Depends(get_current_teacher)):
+    """Generate multiple problems at once (teacher only)."""
+    if not body.prompt.strip():
+        raise HTTPException(status_code=400, detail="Vui lòng nhập mô tả.")
+    count = max(1, min(body.count, 10))
+    try:
+        results = await asyncio.to_thread(_call_llm_bulk_generator_sync, body.prompt.strip(), count)
+        if not isinstance(results, list):
+            raise ValueError("AI không trả về danh sách câu hỏi.")
+        
+        final_results = []
+        for res in results:
+            res.setdefault("problem_type", "multiple_choice")
+            res.setdefault("difficulty", "medium")
+            res.setdefault("category", "Chung")
+            res.setdefault("choices", {"A": "", "B": "", "C": "", "D": ""})
+            res.setdefault("correct_answer", "A")
+            res.setdefault("solution", "")
+            final_results.append(res)
+        return final_results
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Lỗi khi tạo hàng loạt: {str(e)}")
 
 @router.get("/", response_model=ProblemList)
 def get_problems(

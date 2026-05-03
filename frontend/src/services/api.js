@@ -129,6 +129,22 @@ export async function generateProblem(token, prompt) {
   return response.json();
 }
 
+export async function generateProblemsBulk(token, prompt, count) {
+  const response = await fetch(`${API_BASE_URL}/problems/generate-bulk`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify({ prompt, count }),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Lỗi khi tạo hàng loạt bằng AI');
+  }
+  return response.json();
+}
+
 export async function getProblems(token, skip = 0, limit = 10, difficulty = null, category = null) {
   let url = `${API_BASE_URL}/problems/?skip=${skip}&limit=${limit}`;
   if (difficulty) url += `&difficulty=${difficulty}`;
@@ -193,6 +209,59 @@ export async function updateProblem(token, problemId, problemData) {
   return response.json();
 }
 
+// Exam API functions
+export async function getExams(token, skip = 0, limit = 10) {
+  const response = await fetch(`${API_BASE_URL}/exams/?skip=${skip}&limit=${limit}`, {
+    method: 'GET',
+    headers: { 'Authorization': `Bearer ${token}` },
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Lỗi khi tải danh sách đề thi');
+  }
+  return response.json();
+}
+
+export async function getExam(token, examId) {
+  const response = await fetch(`${API_BASE_URL}/exams/${examId}`, {
+    method: 'GET',
+    headers: { 'Authorization': `Bearer ${token}` },
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Lỗi khi tải đề thi');
+  }
+  return response.json();
+}
+
+export async function createExam(token, examData) {
+  const response = await fetch(`${API_BASE_URL}/exams/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify(examData),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Lỗi khi tạo đề thi');
+  }
+  return response.json();
+}
+
+export async function deleteExam(token, examId) {
+  const response = await fetch(`${API_BASE_URL}/exams/${examId}`, {
+    method: 'DELETE',
+    headers: { 'Authorization': `Bearer ${token}` },
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Lỗi khi xóa đề thi');
+  }
+  return response.json();
+}
+
 // Assignment API functions
 export async function getAssignments(token, { studentId, status, skip = 0, limit = 20 } = {}) {
   let url = `${API_BASE_URL}/assignments/?skip=${skip}&limit=${limit}`;
@@ -221,8 +290,10 @@ export async function getAssignment(token, assignmentId) {
   return response.json();
 }
 
-export async function createAssignment(token, { student_id, problem_id, due_date }) {
-  const body = { student_id, problem_id };
+export async function createAssignment(token, { student_id, problem_id, exam_id, due_date }) {
+  const body = { student_id };
+  if (problem_id) body.problem_id = problem_id;
+  if (exam_id) body.exam_id = exam_id;
   if (due_date) body.due_date = due_date;
   const response = await fetch(`${API_BASE_URL}/assignments/`, {
     method: 'POST',

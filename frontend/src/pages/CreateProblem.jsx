@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import logo from '../assets/logo.png';
-import { createProblem, updateProblem, getProblem, generateProblem } from '../services/api';
+import { createProblem, updateProblem, getProblem, generateProblem, generateProblemsBulk } from '../services/api';
 
 export default function CreateProblem() {
   const { user, token, logoutUser } = useAuth();
@@ -37,6 +37,9 @@ export default function CreateProblem() {
   const [aiPrompt, setAiPrompt] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState('');
+  const [aiCount, setAiCount] = useState(3);
+  const [bulkResults, setBulkResults] = useState([]);
+  const [saveLoading, setSaveLoading] = useState(false);
 
   useEffect(() => {
     if (isEdit) loadProblem();
@@ -92,31 +95,40 @@ export default function CreateProblem() {
   const removeTestCase = (idx) => setFormData(prev => ({ ...prev, test_cases: prev.test_cases.filter((_, i) => i !== idx) }));
 
   const handleAiGenerate = async () => {
-    if (!aiPrompt.trim()) { setAiError('Vui lòng nhập mô tả.'); return; }
-    setAiError(''); setAiLoading(true);
+    if (!aiPrompt.trim()) { setAiError('Vui lòng nhập mô tả ý tưởng'); return; }
+    setAiLoading(true);
+    setAiError('');
     try {
-      const data = await generateProblem(token, aiPrompt);
-      setFormData({
-        problem_type: data.problem_type || 'multiple_choice',
-        title: data.title || '',
-        description: data.description || '',
-        difficulty: data.difficulty || 'medium',
-        category: data.category || '',
-        choices: data.choices || { A: '', B: '', C: '', D: '' },
-        correct_answer: data.correct_answer || 'A',
-        solution: data.solution || '',
-        example_input: data.example_input || '',
-        example_output: data.example_output || '',
-        test_cases: Array.isArray(data.test_cases) && data.test_cases.length ? data.test_cases : [{ input: '', output: '' }],
-        time_limit: data.time_limit || 1000,
-        memory_limit: data.memory_limit || 256,
-      });
-      setShowAiModal(false);
-      setAiPrompt('');
+      if (aiCount > 1) {
+        const results = await generateProblemsBulk(token, aiPrompt, aiCount);
+        setBulkResults(results);
+      } else {
+        const result = await generateProblem(token, aiPrompt);
+        setFormData(prev => ({
+          ...prev,
+          ...result,
+          test_cases: result.test_cases || [{ input: '', output: '' }]
+        }));
+        setShowAiModal(false);
+      }
     } catch (err) {
       setAiError(err.message);
     } finally {
       setAiLoading(false);
+    }
+  };
+
+  const handleSaveBulk = async () => {
+    setSaveLoading(true);
+    try {
+      for (const prob of bulkResults) {
+        await createProblem(token, prob);
+      }
+      navigate('/problems');
+    } catch (err) {
+      setAiError('Lỗi khi lưu danh sách: ' + err.message);
+    } finally {
+      setSaveLoading(false);
     }
   };
 
@@ -139,9 +151,7 @@ export default function CreateProblem() {
         payload.example_output = '';
         payload.choices = null;
         payload.correct_answer = null;
-        // solution kept (đáp án mẫu cho giáo viên)
       } else {
-        // algorithm
         payload.choices = null;
         payload.correct_answer = null;
         payload.solution = null;
@@ -197,7 +207,7 @@ export default function CreateProblem() {
                 {isEdit ? 'Chỉnh sửa bài toán' : 'Tạo bài toán mới'}
               </h1>
               {!isEdit && (
-                <button type="button" onClick={() => { setShowAiModal(true); setAiError(''); }}
+                <button type="button" onClick={() => { setShowAiModal(true); setAiError(''); setBulkResults([]); }}
                   className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium text-sm shadow">
                   <span>✨</span><span>Tạo bằng AI</span>
                 </button>
@@ -208,8 +218,6 @@ export default function CreateProblem() {
             {success && <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg text-green-700">{success}</div>}
 
             <form onSubmit={handleSubmit} className="space-y-6">
-
-              {/* Loại bài */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Loại bài toán</label>
                 <div className="flex flex-wrap gap-3">
@@ -227,13 +235,12 @@ export default function CreateProblem() {
                 </div>
               </div>
 
-              {/* Thông tin chung */}
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Tiêu đề *</label>
                   <input type="text" name="title" value={formData.title} onChange={handleInput}
                     className="w-full rounded-md border-gray-300 shadow-sm border p-2 focus:border-blue-500 focus:outline-none"
-                    placeholder={isMCQ ? (ptype === 'trivia' ? 'VD: Thủ đô của Việt Nam là gì?' : 'VD: Câu 1. Tính đạo hàm của hàm số y = x³ - 3x') : isObjective ? 'VD: Mệnh đề nào sau đây đúng?' : 'VD: Tổng hai số'} />
+                    placeholder="VD: Tiêu đề bài toán" />
                 </div>
 
                 <div>
@@ -242,11 +249,7 @@ export default function CreateProblem() {
                   </label>
                   <textarea name="description" value={formData.description} onChange={handleInput} rows="5"
                     className="w-full rounded-md border-gray-300 shadow-sm border p-2 focus:border-blue-500 focus:outline-none"
-                    placeholder={isMCQ
-                      ? (ptype === 'trivia' ? 'Nhập nội dung câu đố...' : 'Cho hàm số f(x) = x³ - 3x. Tính f\'(x) = ?')
-                      : isObjective
-                        ? 'Nhập nội dung cần xác định đúng/sai...'
-                        : 'Mô tả đầy đủ bài toán, input/output format, ràng buộc...'} />
+                    placeholder="Nhập nội dung đề bài..." />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -263,12 +266,11 @@ export default function CreateProblem() {
                     <label className="block text-sm font-medium text-gray-700 mb-1">Chủ đề *</label>
                     <input type="text" name="category" value={formData.category} onChange={handleInput}
                       className="w-full rounded-md border-gray-300 shadow-sm border p-2 focus:border-blue-500 focus:outline-none"
-                      placeholder={ptype === 'trivia' ? 'Đố mẹo, Kiến thức, IQ...' : isObjective ? 'Giải tích, Hình học, Đại số...' : 'Arrays, DP, Math...'} />
+                      placeholder="VD: Toán, Lập trình..." />
                   </div>
                 </div>
               </div>
 
-              {/* MCQ: 4 phương án */}
               {isMCQ && (
                 <div className="space-y-3 pb-6 border-b border-gray-200">
                   <h2 className="text-lg font-semibold text-gray-900">Các phương án *</h2>
@@ -293,7 +295,6 @@ export default function CreateProblem() {
                 </div>
               )}
 
-              {/* True/False */}
               {ptype === 'true_false' && (
                 <div className="space-y-3 pb-6 border-b border-gray-200">
                   <h2 className="text-lg font-semibold text-gray-900">Đáp án đúng *</h2>
@@ -313,17 +314,15 @@ export default function CreateProblem() {
                 </div>
               )}
 
-              {/* Lời giải (math + trivia + essay) */}
               {(isObjective || isEssay) && (
                 <div className="pb-6 border-b border-gray-200">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Lời giải / Giải thích chi tiết</label>
                   <textarea name="solution" value={formData.solution} onChange={handleInput} rows="4"
                     className="w-full rounded-md border-gray-300 shadow-sm border p-2 text-sm focus:border-blue-500 focus:outline-none"
-                    placeholder={isEssay ? "Lời giải mẫu để giáo viên tham khảo khi chấm bài... (chỉ giáo viên thấy)" : "Giải thích đáp án... (chỉ giáo viên thấy)"} />
+                    placeholder="Giải thích đáp án (chỉ giáo viên thấy)..." />
                 </div>
               )}
 
-              {/* Algorithm: ví dụ + test cases */}
               {!isObjective && !isEssay && (
                 <>
                   <div className="space-y-4 pb-6 border-b border-gray-200">
@@ -402,7 +401,6 @@ export default function CreateProblem() {
         </div>
       </main>
 
-      {/* AI Modal */}
       {showAiModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg p-6">
@@ -414,24 +412,61 @@ export default function CreateProblem() {
 
             <textarea value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)} rows="4" disabled={aiLoading}
               className="w-full rounded-lg border border-gray-300 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none mb-3"
-              placeholder="VD: Câu đố vui về con vật, mức dễ&#10;VD: Câu hỏi kiến thức lịch sử Việt Nam triều Trần&#10;VD: Câu trắc nghiệm đạo hàm mức khó&#10;VD: Bài lập trình tìm đường đi ngắn nhất" />
+              placeholder="Nhập mô tả bài toán bạn muốn tạo..." />
+
+            <div className="flex items-center gap-4 mb-4">
+              <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Số lượng câu hỏi:</label>
+              <select 
+                value={aiCount} 
+                onChange={(e) => setAiCount(Number(e.target.value))}
+                className="rounded-lg border border-gray-300 p-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+              >
+                {[1, 2, 3, 5, 10].map(n => <option key={n} value={n}>{n} câu</option>)}
+              </select>
+              <span className="text-xs text-gray-500 italic">(Tạo hàng loạt sẽ lưu trực tiếp vào kho)</span>
+            </div>
 
             {aiError && <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{aiError}</div>}
 
-            <div className="flex gap-3">
-              <button type="button" onClick={handleAiGenerate} disabled={aiLoading}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium disabled:opacity-50">
-                {aiLoading ? (
-                  <><svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                  </svg><span>Đang tạo...</span></>
-                ) : <><span>✨</span><span>Tạo bài toán</span></>}
+            {bulkResults.length > 0 && (
+              <div className="mb-4 max-h-60 overflow-y-auto border border-gray-200 rounded-lg p-2 bg-gray-50">
+                <h4 className="text-sm font-bold text-gray-800 mb-2 px-1">Kết quả ({bulkResults.length})</h4>
+                {bulkResults.map((p, idx) => (
+                  <div key={idx} className="p-3 bg-white border border-gray-200 rounded-lg mb-2 shadow-sm">
+                    <p className="text-sm font-bold text-blue-600">{p.title}</p>
+                    <p className="text-xs text-gray-500 line-clamp-2">{p.description}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="flex justify-end gap-3">
+              <button 
+                onClick={() => { setShowAiModal(false); setBulkResults([]); setAiPrompt(''); }} 
+                className="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium"
+              >
+                Hủy
               </button>
-              <button type="button" onClick={() => { setShowAiModal(false); setAiPrompt(''); setAiError(''); }} disabled={aiLoading}
-                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium disabled:opacity-50">Hủy</button>
+              
+              {bulkResults.length > 0 ? (
+                <button 
+                  onClick={handleSaveBulk} 
+                  disabled={saveLoading}
+                  className="px-6 py-2 bg-gradient-to-r from-green-600 to-green-500 text-white rounded-lg font-bold hover:shadow-lg transition-all disabled:opacity-50"
+                >
+                  {saveLoading ? 'Đang lưu...' : `Lưu ${bulkResults.length} câu vào kho`}
+                </button>
+              ) : (
+                <button 
+                  onClick={handleAiGenerate} 
+                  disabled={aiLoading}
+                  className="px-6 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg font-bold hover:shadow-lg transition-all disabled:opacity-50"
+                >
+                  {aiLoading ? 'Đang tạo...' : 'Bắt đầu tạo'}
+                </button>
+              )}
             </div>
-            <p className="mt-3 text-xs text-gray-400 text-center">Sử dụng DeepSeek AI · 10–20 giây</p>
+            <p className="mt-3 text-xs text-gray-400 text-center">Sử dụng DeepSeek AI · 10–30 giây</p>
           </div>
         </div>
       )}

@@ -60,7 +60,7 @@ export default function Dashboard() {
           <p className="text-slate-500 font-medium">Hôm nay bạn muốn thực hiện công việc gì?</p>
         </header>
 
-        <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
+        <div className={`grid grid-cols-1 gap-8 sm:grid-cols-2 ${user?.role === 'teacher' ? 'lg:grid-cols-4' : 'lg:grid-cols-3'}`}>
           {/* Card: Quản lý học sinh */}
           {user?.role === 'teacher' && (
             <Link
@@ -83,6 +83,27 @@ export default function Dashboard() {
               </div>
             </Link>
           )}
+
+          {/* Card: Kho đề thi */}
+          <Link
+            to="/exams"
+            className="group relative overflow-hidden p-8 bg-white/60 backdrop-blur-xl rounded-3xl border border-white/40 shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:shadow-purple-200/40 hover:-translate-y-2 transition-all duration-300"
+          >
+            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-24 w-24" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            </div>
+            <div className="relative z-10">
+              <div className="w-14 h-14 bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-purple-200 mb-6 group-hover:scale-110 transition-transform duration-300">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              </div>
+              <h3 className="text-2xl font-bold text-slate-900 mb-3">Kho đề thi</h3>
+              <p className="text-slate-500 leading-relaxed font-medium">Tổ chức câu hỏi thành đề thi chuyên nghiệp, trộn mã đề và quản lý kho đề bài giảng.</p>
+            </div>
+          </Link>
 
           {/* Card: Kho bài toán */}
           <Link
