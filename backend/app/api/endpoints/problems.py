@@ -3,7 +3,7 @@ from typing import List
 from uuid import UUID
 import json
 import os
-import httpx
+import asyncio
 import uuid
 from pydantic import BaseModel
 from app.services.supabase_client import supabase_client
@@ -79,54 +79,78 @@ QUY TẮC CHUNG:
 - Chỉ trả về JSON thuần túy"""
 
 
-async def _generate_with_deepseek(prompt: str) -> dict:
+# ── Sync LLM callers (same pattern as submissions.py which works on Railway) ──
+
+def _generate_with_deepseek_sync(prompt: str) -> dict:
+    """Sync call to DeepSeek (identical pattern to working grading function)."""
+    import httpx
     api_key = os.environ.get("DEEPSEEK_API_KEY", "")
     if not api_key:
-        raise ValueError("No DeepSeek key")
-    async with httpx.AsyncClient(timeout=60) as client:
-        resp = await client.post(
-            "https://api.deepseek.com/chat/completions",
-            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-            json={
-                "model": "deepseek-chat",
-                "messages": [
-                    {"role": "system", "content": GENERATE_SYSTEM_PROMPT},
-                    {"role": "user", "content": f"Tạo bài toán về: {prompt}"},
-                ],
-                "temperature": 0.7,
-                "max_tokens": 2000,
-            },
-        )
-        resp.raise_for_status()
-        content = resp.json()["choices"][0]["message"]["content"].strip()
-        return json.loads(content)
+        raise ValueError("DEEPSEEK_API_KEY not configured")
+    resp = httpx.post(
+        "https://api.deepseek.com/chat/completions",
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+        json={
+            "model": "deepseek-chat",
+            "messages": [
+                {"role": "system", "content": GENERATE_SYSTEM_PROMPT},
+                {"role": "user", "content": f"Tạo bài toán về: {prompt}"},
+            ],
+            "temperature": 0.7,
+            "max_tokens": 2000,
+        },
+        timeout=90.0,
+    )
+    resp.raise_for_status()
+    content = resp.json()["choices"][0]["message"]["content"].strip()
+    # Strip markdown code fences if AI wraps JSON in ```
+    if content.startswith("```"):
+        content = content.split("```")[1]
+        if content.startswith("json"):
+            content = content[4:]
+    return json.loads(content.strip())
 
 
-async def _generate_with_anthropic(prompt: str) -> dict:
+def _generate_with_anthropic_sync(prompt: str) -> dict:
+    """Sync call to Anthropic (identical pattern to working grading function)."""
     import anthropic
     api_key = os.environ.get("ANTHROPIC_API_KEY", "")
     if not api_key:
-        raise ValueError("No Anthropic key")
+        raise ValueError("ANTHROPIC_API_KEY not configured")
     client = anthropic.Anthropic(api_key=api_key)
     message = client.messages.create(
-        model="claude-haiku-4-5",
+        model="claude-haiku-4-5-20251001",
         max_tokens=2000,
         system=GENERATE_SYSTEM_PROMPT,
         messages=[{"role": "user", "content": f"Tạo bài toán về: {prompt}"}],
     )
     content = message.content[0].text.strip()
-    return json.loads(content)
+    if content.startswith("```"):
+        content = content.split("```")[1]
+        if content.startswith("json"):
+            content = content[4:]
+    return json.loads(content.strip())
 
 
-async def _call_llm_generator(prompt: str) -> dict:
+def _call_llm_generator_sync(prompt: str) -> dict:
+    """Try DeepSeek first, fallback to Anthropic. Pure sync like grading."""
+    last_error = None
+
     if os.environ.get("DEEPSEEK_API_KEY"):
         try:
-            return await _generate_with_deepseek(prompt)
-        except Exception:
-            pass
+            return _generate_with_deepseek_sync(prompt)
+        except Exception as e:
+            last_error = e
+
     if os.environ.get("ANTHROPIC_API_KEY"):
-        return await _generate_with_anthropic(prompt)
-    raise HTTPException(status_code=503, detail="Không có API key LLM nào được cấu hình.")
+        try:
+            return _generate_with_anthropic_sync(prompt)
+        except Exception as e:
+            last_error = e
+
+    if last_error:
+        raise last_error
+    raise ValueError("Chưa cấu hình API key (DEEPSEEK_API_KEY hoặc ANTHROPIC_API_KEY).")
 
 
 class GenerateRequest(BaseModel):
@@ -139,18 +163,18 @@ async def generate_problem(body: GenerateRequest, current_user = Depends(get_cur
     if not body.prompt.strip():
         raise HTTPException(status_code=400, detail="Vui lòng nhập mô tả ý tưởng bài toán.")
     try:
-        result = await _call_llm_generator(body.prompt.strip())
+        # Run sync LLM call in thread pool (same as grading pattern)
+        result = await asyncio.to_thread(_call_llm_generator_sync, body.prompt.strip())
         # Validate required fields
-        required = ["title", "description", "difficulty", "category",
-                    "example_input", "example_output", "test_cases"]
+        required = ["title", "description", "difficulty", "category"]
         for field in required:
             if field not in result:
-                raise ValueError(f"Missing field: {field}")
+                raise ValueError(f"Thiếu trường bắt buộc: {field}")
         return result
     except HTTPException:
         raise
     except json.JSONDecodeError as e:
-        raise HTTPException(status_code=500, detail=f"AI trả về dữ liệu không hợp lệ: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"AI trả về định dạng không hợp lệ: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Lỗi khi tạo bài toán bằng AI: {str(e)}")
 
