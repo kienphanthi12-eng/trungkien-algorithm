@@ -1,11 +1,14 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from typing import List, Optional, Dict, Any
 from uuid import UUID
 from datetime import datetime
+import json
+
 
 class TestCase(BaseModel):
     input: str
     output: str
+
 
 class ProblemBase(BaseModel):
     title: str
@@ -24,8 +27,33 @@ class ProblemBase(BaseModel):
     correct_answer: Optional[str] = None       # "A"/"B"/"C"/"D" or "true"/"false"
     solution: Optional[str] = None             # Lời giải chi tiết
 
+    @field_validator("test_cases", mode="before")
+    @classmethod
+    def parse_test_cases(cls, v):
+        """Supabase JSONB may return '[]' as a string — parse it."""
+        if isinstance(v, str):
+            try:
+                parsed = json.loads(v)
+                return parsed if isinstance(parsed, list) else []
+            except (json.JSONDecodeError, ValueError):
+                return []
+        return v if v is not None else []
+
+    @field_validator("choices", mode="before")
+    @classmethod
+    def parse_choices(cls, v):
+        """Supabase JSONB may return choices as a string — parse it."""
+        if isinstance(v, str):
+            try:
+                return json.loads(v)
+            except (json.JSONDecodeError, ValueError):
+                return None
+        return v
+
+
 class ProblemCreate(ProblemBase):
     pass
+
 
 class ProblemUpdate(BaseModel):
     title: Optional[str] = None
@@ -42,6 +70,7 @@ class ProblemUpdate(BaseModel):
     correct_answer: Optional[str] = None
     solution: Optional[str] = None
 
+
 class Problem(ProblemBase):
     id: UUID
     created_by: UUID
@@ -50,6 +79,7 @@ class Problem(ProblemBase):
 
     class Config:
         from_attributes = True
+
 
 class ProblemList(BaseModel):
     problems: List[Problem]
