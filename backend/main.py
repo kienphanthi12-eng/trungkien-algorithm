@@ -6,13 +6,25 @@ import os
 
 app = FastAPI(title="ZENTUS API", version="1.5.0")
 
-# CORS config - Allow all origins for Phase 1 to avoid "Failed to fetch" errors
+# CORS config - Optimized for Production
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=[
+        "https://trungkien-algorithm.vercel.app",
+        "http://localhost:5173",
+        "http://localhost:3000",
+    ],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allow_headers=[
+        "Content-Type",
+        "Set-Cookie",
+        "Access-Control-Allow-Headers",
+        "Access-Control-Allow-Origin",
+        "Authorization",
+        "X-Requested-With",
+        "Accept",
+    ],
 )
 
 app.include_router(auth.router, prefix="/auth", tags=["Auth"])
