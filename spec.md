@@ -1,4 +1,4 @@
-# TrungKien Algorithm — Technical Specification
+# ZENTUS — Technical Specification
 
 ## Overview
 Teacher-student platform for Vietnamese math olympiad training. Teachers create/assign problems, students submit solutions, AI grades automatically.

@@ -4,7 +4,7 @@ from app.api.endpoints import auth, students, problems, assignments, submissions
 
 import os
 
-app = FastAPI(title="TrungKien Algorithm API", version="1.5.0")
+app = FastAPI(title="ZENTUS API", version="1.5.0")
 
 # CORS config - Allow all origins for Phase 1 to avoid "Failed to fetch" errors
 app.add_middleware(
@@ -24,4 +24,4 @@ app.include_router(chat.router, prefix="/chat", tags=["Chat"])
 
 @app.get("/")
 def read_root():
-    return {"message": "Welcome to TrungKien Algorithm API Phase 6"}
+    return {"message": "Welcome to ZENTUS API Phase 6"}

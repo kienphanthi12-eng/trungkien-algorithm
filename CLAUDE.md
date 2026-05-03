@@ -1,11 +1,11 @@
-# TrungKien Algorithm Platform
+# ZENTUS Platform
 
 ## Project Status
 - Phase 1: ✅ Complete (Auth - login/register/me)
 - Phase 2: ✅ Complete (Student Management)
-- Phase 3: 🚀 In Progress (Problem Management - CRUD operations)
-- Phase 4: 🔲 Pending (Assignment Flow)
-- Phase 5: 🔲 Pending (Submission & Grading)
+- Phase 3: ✅ Complete (Problem Management - CRUD operations)
+- Phase 4: ✅ Complete (Assignment Flow - create/list/detail assignments, Giao bài modal)
+- Phase 5: ✅ Complete (Submission & Grading - student submit, AI grading with Claude)
 - Phase 6: 🔲 Pending (LLM Proxy)
 
 ## Tech Stack

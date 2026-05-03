@@ -206,7 +206,9 @@ export default function AssignmentDetail() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
             <div className="flex items-center">
-              <Link to="/" className="text-xl font-bold text-blue-600 mr-8">TrungKien Algorithm</Link>
+              <Link to="/" className="flex items-center gap-2 mr-8">
+                <img src="/logo.png" alt="ZENTUS" className="h-10 w-auto" />
+              </Link>
               <div className="hidden md:flex">
                 <Link to="/" className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">Dashboard</Link>
                 {user?.role === 'teacher' && (

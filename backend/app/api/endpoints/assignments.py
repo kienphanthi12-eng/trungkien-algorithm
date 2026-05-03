@@ -4,6 +4,7 @@ from uuid import UUID
 from app.services.supabase_client import supabase_client
 from app.api.dependencies import get_current_user, get_current_teacher
 from app.schemas.assignments import Assignment, AssignmentCreate, AssignmentList
+import uuid
 
 router = APIRouter()
 
@@ -91,6 +92,7 @@ def create_assignment(
             )
 
         payload: dict = {
+            "id": str(uuid.uuid4()),
             "teacher_id": str(current_user.id),
             "student_id": str(assignment_in.student_id),
             "problem_id": str(assignment_in.problem_id),

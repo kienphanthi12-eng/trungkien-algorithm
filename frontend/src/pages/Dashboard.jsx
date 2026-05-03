@@ -9,9 +9,16 @@ export default function Dashboard() {
       <nav className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
-            <div className="flex-shrink-0 flex items-center">
-              <h1 className="text-xl font-bold text-blue-600">TrungKien Algorithm</h1>
-            </div>
+              <div className="flex items-center gap-2">
+                <img 
+                  src="/logo.png" 
+                  alt="ZENTUS Logo"                   className="h-10 w-auto"
+                  onError={(e) => {
+                    e.target.onerror = null; 
+                    e.target.parentElement.innerHTML = '<h1 class="text-xl font-bold text-blue-600">ZENTUS</h1>';
+                  }}
+                />
+              </div>
             <div className="flex items-center space-x-4">
               <span className="text-gray-700 text-sm sm:text-base">
                 Xin chào, <span className="font-semibold">{user?.name}</span>
