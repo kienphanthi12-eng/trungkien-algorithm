@@ -233,12 +233,12 @@ export default function CreateProblem() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">Tiêu đề *</label>
                   <input type="text" name="title" value={formData.title} onChange={handleInput}
                     className="w-full rounded-md border-gray-300 shadow-sm border p-2 focus:border-blue-500 focus:outline-none"
-                    placeholder={isMCQ ? 'VD: Câu 1. Tính đạo hàm của hàm số y = x³ - 3x' : isMath ? 'VD: Mệnh đề nào sau đây đúng?' : 'VD: Tổng hai số'} />
+                    placeholder={isMCQ ? (ptype === 'trivia' ? 'VD: Thủ đô của Việt Nam là gì?' : 'VD: Câu 1. Tính đạo hàm của hàm số y = x³ - 3x') : isObjective ? 'VD: Mệnh đề nào sau đây đúng?' : 'VD: Tổng hai số'} />
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {isMath ? 'Đề bài *' : 'Mô tả chi tiết *'}
+                    {isObjective ? 'Đề bài *' : 'Mô tả chi tiết *'}
                   </label>
                   <textarea name="description" value={formData.description} onChange={handleInput} rows="5"
                     className="w-full rounded-md border-gray-300 shadow-sm border p-2 focus:border-blue-500 focus:outline-none"
@@ -324,7 +324,7 @@ export default function CreateProblem() {
               )}
 
               {/* Algorithm: ví dụ + test cases */}
-              {!isMath && !isEssay && (
+              {!isObjective && !isEssay && (
                 <>
                   <div className="space-y-4 pb-6 border-b border-gray-200">
                     <h2 className="text-lg font-semibold text-gray-900">Ví dụ</h2>
