@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Link } from 'react-router-dom';
-import { getExams, deleteExam } from '../services/api';
+import { getExams, deleteExam, getStudents, createAssignment } from '../services/api';
 import logo from '../assets/logo.png';
 
 export default function Exams() {
@@ -10,6 +10,15 @@ export default function Exams() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  // Assign modal state
+  const [assignModalExam, setAssignModalExam] = useState(null); // exam object or null
+  const [students, setStudents] = useState([]);
+  const [selectedStudent, setSelectedStudent] = useState('');
+  const [dueDate, setDueDate] = useState('');
+  const [assigning, setAssigning] = useState(false);
+  const [assignError, setAssignError] = useState('');
+  const [assignSuccess, setAssignSuccess] = useState(false);
 
   useEffect(() => {
     if (token) loadExams();
@@ -39,6 +48,48 @@ export default function Exams() {
     }
   };
 
+  const openAssignModal = async (exam) => {
+    setAssignModalExam(exam);
+    setAssignError('');
+    setAssignSuccess(false);
+    setSelectedStudent('');
+    setDueDate('');
+    try {
+      const data = await getStudents(token);
+      setStudents(data);
+    } catch {
+      setStudents([]);
+    }
+  };
+
+  const closeAssignModal = () => {
+    setAssignModalExam(null);
+    setAssignError('');
+    setAssignSuccess(false);
+  };
+
+  const handleAssign = async () => {
+    if (!selectedStudent) {
+      setAssignError('Vui lòng chọn học sinh.');
+      return;
+    }
+    setAssigning(true);
+    setAssignError('');
+    try {
+      await createAssignment(token, {
+        exam_id: assignModalExam.id,
+        student_id: selectedStudent,
+        due_date: dueDate ? new Date(dueDate).toISOString() : null,
+      });
+      setAssignSuccess(true);
+      setTimeout(() => closeAssignModal(), 1500);
+    } catch (err) {
+      setAssignError(err.message);
+    } finally {
+      setAssigning(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 relative overflow-hidden">
       {/* Background Blobs */}
@@ -57,7 +108,7 @@ export default function Exams() {
               </span>
             </div>
             <div className="flex items-center gap-4">
-               {user?.role === 'teacher' && (
+              {user?.role === 'teacher' && (
                 <Link to="/exams/create" className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-sm font-bold rounded-xl shadow-lg shadow-blue-200 hover:scale-105 transition-all">
                   + Tạo đề thi mới
                 </Link>
@@ -108,7 +159,7 @@ export default function Exams() {
                   </div>
                   <h3 className="text-xl font-bold text-slate-900 mb-2">{exam.title}</h3>
                   <p className="text-slate-500 text-sm mb-6 line-clamp-2">{exam.description || 'Không có mô tả.'}</p>
-                  
+
                   <div className="flex items-center gap-4 text-xs font-bold text-slate-400 mb-6">
                     <span className="flex items-center gap-1">
                       <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -125,9 +176,12 @@ export default function Exams() {
                   </div>
 
                   <div className="flex gap-2">
-                    <Link to={`/assignments/create?exam_id=${exam.id}`} className="flex-1 py-2.5 bg-slate-900 text-white text-center text-sm font-bold rounded-xl hover:bg-slate-800 transition-colors">
+                    <button
+                      onClick={() => openAssignModal(exam)}
+                      className="flex-1 py-2.5 bg-slate-900 text-white text-center text-sm font-bold rounded-xl hover:bg-slate-800 transition-colors"
+                    >
                       Giao bài
-                    </Link>
+                    </button>
                     {user?.role === 'teacher' && (
                       <button onClick={() => handleDelete(exam.id)} className="p-2.5 bg-red-50 text-red-600 rounded-xl hover:bg-red-500 hover:text-white transition-all border border-red-100">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -142,6 +196,71 @@ export default function Exams() {
           </div>
         )}
       </main>
+
+      {/* Assign Modal */}
+      {assignModalExam && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-8">
+            <h3 className="text-xl font-black text-slate-900 mb-1">Giao đề thi</h3>
+            <p className="text-slate-500 text-sm mb-6">
+              <span className="font-bold text-blue-600">{assignModalExam.title}</span> — {assignModalExam.problems?.length || 0} câu hỏi
+            </p>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">Chọn học sinh *</label>
+                {students.length === 0 ? (
+                  <p className="text-slate-400 text-sm italic">Chưa có học sinh trong lớp. <Link to="/students" className="text-blue-600 underline">Thêm học sinh</Link></p>
+                ) : (
+                  <select
+                    value={selectedStudent}
+                    onChange={e => setSelectedStudent(e.target.value)}
+                    className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">-- Chọn học sinh --</option>
+                    {students.map(s => (
+                      <option key={s.id} value={s.id}>{s.name} ({s.email})</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">Hạn nộp (tùy chọn)</label>
+                <input
+                  type="datetime-local"
+                  value={dueDate}
+                  onChange={e => setDueDate(e.target.value)}
+                  className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              {assignError && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">{assignError}</div>
+              )}
+              {assignSuccess && (
+                <div className="p-3 bg-green-50 border border-green-200 rounded-xl text-green-700 text-sm font-bold">✅ Giao bài thành công!</div>
+              )}
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={closeAssignModal}
+                className="flex-1 py-2.5 border border-slate-200 text-slate-600 text-sm font-bold rounded-xl hover:bg-slate-50 transition-colors"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={handleAssign}
+                disabled={assigning || assignSuccess || students.length === 0}
+                className="flex-1 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-sm font-bold rounded-xl hover:opacity-90 transition-all disabled:opacity-50"
+              >
+                {assigning ? 'Đang giao...' : 'Xác nhận giao bài'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
