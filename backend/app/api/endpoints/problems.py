@@ -166,10 +166,19 @@ async def generate_problem(body: GenerateRequest, current_user = Depends(get_cur
         # Run sync LLM call in thread pool (same as grading pattern)
         result = await asyncio.to_thread(_call_llm_generator_sync, body.prompt.strip())
         # Validate required fields
-        required = ["title", "description", "difficulty", "category"]
-        for field in required:
-            if field not in result:
+        for field in ["title", "description", "difficulty", "category"]:
+            if field not in result or not result[field]:
                 raise ValueError(f"Thiếu trường bắt buộc: {field}")
+        # Fill defaults for optional fields (AI đôi khi bỏ qua chúng với bài toán)
+        result.setdefault("problem_type", "algorithm")
+        result.setdefault("example_input", "")
+        result.setdefault("example_output", "")
+        result.setdefault("test_cases", [])
+        result.setdefault("time_limit", 1000)
+        result.setdefault("memory_limit", 256)
+        result.setdefault("choices", None)
+        result.setdefault("correct_answer", None)
+        result.setdefault("solution", None)
         return result
     except HTTPException:
         raise
