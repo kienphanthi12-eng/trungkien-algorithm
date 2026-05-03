@@ -4,6 +4,7 @@ import re
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from typing import Optional
 from uuid import UUID
+import uuid
 from datetime import datetime, timezone
 from app.services.supabase_client import supabase_client
 from app.api.dependencies import get_current_user
@@ -92,6 +93,19 @@ Trả về JSON với format chính xác như sau (không có text nào khác):
   }
 }"""
 
+ESSAY_GRADING_SYSTEM_PROMPT = """Bạn là giáo viên chấm bài tự luận cho học sinh Việt Nam (toán, lý, hóa, văn hoặc các môn khác).
+Chấm bài dựa trên đề bài và bài làm của học sinh. KHÔNG đánh giá về code hay lập trình.
+Trả về JSON với format chính xác như sau (không có text nào khác):
+{
+  "score": <số từ 0.0 đến 10.0>,
+  "overall": "<nhận xét tổng thể về bài làm>",
+  "criteria": {
+    "correctness": {"score": <0-10>, "comment": "<kết quả/đáp án có đúng không, sai ở đâu>"},
+    "clarity": {"score": <0-10>, "comment": "<trình bày có rõ ràng, logic, đầy đủ bước không>"},
+    "completeness": {"score": <0-10>, "comment": "<giải quyết đầy đủ yêu cầu đề bài chưa>"}
+  }
+}"""
+
 
 def _build_grading_user_msg(problem_title: str, problem_description: str, answer_text: str) -> str:
     return f"""ĐỀ BÀI: {problem_title}
@@ -115,7 +129,8 @@ def _parse_grading_response(response_text: str) -> dict:
     return feedback
 
 
-def _grade_with_deepseek(problem_title: str, problem_description: str, answer_text: str) -> dict:
+def _grade_with_deepseek(problem_title: str, problem_description: str, answer_text: str,
+                         system_prompt: str = None) -> dict:
     """Call DeepSeek API (OpenAI-compatible). Cheapest option."""
     import httpx
 
@@ -131,7 +146,7 @@ def _grade_with_deepseek(problem_title: str, problem_description: str, answer_te
         json={
             "model": "deepseek-chat",
             "messages": [
-                {"role": "system", "content": GRADING_SYSTEM_PROMPT},
+                {"role": "system", "content": system_prompt or GRADING_SYSTEM_PROMPT},
                 {"role": "user", "content": user_msg},
             ],
             "max_tokens": 1024,
@@ -154,7 +169,8 @@ def _grade_with_deepseek(problem_title: str, problem_description: str, answer_te
     return {"score": feedback["score"], "feedback_json": feedback, "llm_cost": llm_cost, "model": "deepseek-chat"}
 
 
-def _grade_with_anthropic(problem_title: str, problem_description: str, answer_text: str) -> dict:
+def _grade_with_anthropic(problem_title: str, problem_description: str, answer_text: str,
+                          system_prompt: str = None) -> dict:
     """Call Anthropic Claude Haiku. Fallback option."""
     import anthropic
 
@@ -169,7 +185,7 @@ def _grade_with_anthropic(problem_title: str, problem_description: str, answer_t
         model="claude-haiku-4-5-20251001",
         max_tokens=1024,
         messages=[{"role": "user", "content": user_msg}],
-        system=GRADING_SYSTEM_PROMPT,
+        system=system_prompt or GRADING_SYSTEM_PROMPT,
     )
 
     response_text = message.content[0].text.strip()
@@ -183,18 +199,20 @@ def _grade_with_anthropic(problem_title: str, problem_description: str, answer_t
     return {"score": feedback["score"], "feedback_json": feedback, "llm_cost": llm_cost, "model": "claude-haiku-4-5"}
 
 
-def _call_llm_grader(problem_title: str, problem_description: str, answer_text: str) -> dict:
+def _call_llm_grader(problem_title: str, problem_description: str, answer_text: str,
+                     system_prompt: str = None) -> dict:
     """
     Grade with DeepSeek first (cheaper), fallback to Anthropic.
     Returns: {"score": float, "feedback_json": dict, "llm_cost": float}
     """
+    sp = system_prompt or GRADING_SYSTEM_PROMPT
     last_error = None
 
     # 1. Try DeepSeek first (cheapest)
     deepseek_key = os.environ.get("DEEPSEEK_API_KEY", "")
     if deepseek_key:
         try:
-            return _grade_with_deepseek(problem_title, problem_description, answer_text)
+            return _grade_with_deepseek(problem_title, problem_description, answer_text, sp)
         except Exception as e:
             last_error = e
 
@@ -202,7 +220,7 @@ def _call_llm_grader(problem_title: str, problem_description: str, answer_text: 
     anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "")
     if anthropic_key:
         try:
-            return _grade_with_anthropic(problem_title, problem_description, answer_text)
+            return _grade_with_anthropic(problem_title, problem_description, answer_text, sp)
         except Exception as e:
             last_error = e
 
@@ -223,6 +241,41 @@ def _call_llm_grader(problem_title: str, problem_description: str, answer_text: 
         },
         "llm_cost": 0.0,
         "model": "none",
+    }
+
+
+def _auto_grade_objective(problem_type: str, correct_answer: str, student_answer: str) -> dict:
+    """Instant auto-grading for multiple_choice and true_false — no AI needed."""
+    if problem_type == "multiple_choice":
+        sa = student_answer.strip().upper()
+        ca = (correct_answer or "").strip().upper()
+    else:  # true_false
+        sa = student_answer.strip().lower()
+        ca = (correct_answer or "").strip().lower()
+
+    is_correct = sa == ca
+    score = 10.0 if is_correct else 0.0
+    display_answer = sa if problem_type == "multiple_choice" else ("Đúng" if sa == "true" else "Sai")
+    display_correct = ca if problem_type == "multiple_choice" else ("Đúng" if ca == "true" else "Sai")
+
+    return {
+        "score": score,
+        "feedback_json": {
+            "score": score,
+            "overall": (
+                f"✓ Chính xác! Bạn chọn: {display_answer}."
+                if is_correct else
+                f"✗ Chưa đúng. Bạn chọn: {display_answer} — Đáp án đúng: {display_correct}."
+            ),
+            "criteria": {
+                "correctness": {"score": score, "comment": "Đúng" if is_correct else "Sai"},
+                "clarity": {"score": 10, "comment": "—"},
+                "efficiency": {"score": 10, "comment": "—"},
+            },
+            "model": "auto",
+        },
+        "llm_cost": 0.0,
+        "model": "auto",
     }
 
 
@@ -278,6 +331,7 @@ def create_submission(
 
         # Create submission
         payload = {
+            "id": str(uuid.uuid4()),
             "assignment_id": str(submission_in.assignment_id),
             "student_id": str(current_user.id),
             "text_content": submission_in.text_content or "",
@@ -291,8 +345,39 @@ def create_submission(
                 detail="Lỗi khi tạo bài nộp.",
             )
 
-        # Update assignment status to 'submitted'
-        supabase_client.table("assignments").update({"status": "submitted"}).eq(
+        submission_id = sub_resp.data[0]["id"]
+        new_status = "submitted"
+
+        # Auto-grade MCQ / true_false immediately on submission
+        try:
+            prob_resp = (
+                supabase_client.table("problems")
+                .select("problem_type, correct_answer")
+                .eq("id", str(assignment["problem_id"]))
+                .execute()
+            )
+            if prob_resp.data:
+                ptype = prob_resp.data[0].get("problem_type", "algorithm") or "algorithm"
+                correct_answer = prob_resp.data[0].get("correct_answer")
+                if ptype in ("multiple_choice", "true_false") and correct_answer:
+                    grade_result = _auto_grade_objective(
+                        ptype, correct_answer, submission_in.text_content or ""
+                    )
+                    grade_payload = {
+                        "id": str(uuid.uuid4()),
+                        "submission_id": submission_id,
+                        "score": grade_result["score"],
+                        "feedback_json": grade_result["feedback_json"],
+                        "graded_at": datetime.now(timezone.utc).isoformat(),
+                        "llm_cost": 0.0,
+                    }
+                    supabase_client.table("grades").insert(grade_payload).execute()
+                    new_status = "graded"
+        except Exception:
+            pass  # Don't fail submission if auto-grading errors
+
+        # Update assignment status
+        supabase_client.table("assignments").update({"status": new_status}).eq(
             "id", str(submission_in.assignment_id)
         ).execute()
 
@@ -435,16 +520,20 @@ def grade_submission(
         # Get problem info for grading context
         problem_title = ""
         problem_description = ""
+        problem_type = "algorithm"
+        correct_answer = None
         try:
             prob_resp = (
                 supabase_client.table("problems")
-                .select("title, description")
+                .select("title, description, problem_type, correct_answer")
                 .eq("id", str(assignment["problem_id"]))
                 .execute()
             )
             if prob_resp.data:
                 problem_title = prob_resp.data[0]["title"]
                 problem_description = prob_resp.data[0]["description"]
+                problem_type = prob_resp.data[0].get("problem_type", "algorithm") or "algorithm"
+                correct_answer = prob_resp.data[0].get("correct_answer")
         except Exception:
             pass
 
@@ -460,15 +549,32 @@ def grade_submission(
                 "submission_id", str(submission_id)
             ).execute()
 
-        # Call LLM grader
-        grading_result = _call_llm_grader(
-            problem_title=problem_title,
-            problem_description=problem_description,
-            answer_text=sub.get("text_content", ""),
-        )
+        # Grade based on problem type
+        if problem_type in ("multiple_choice", "true_false"):
+            # Instant auto-grade — no AI needed
+            grading_result = _auto_grade_objective(
+                problem_type, correct_answer or "", sub.get("text_content", "")
+            )
+        elif problem_type == "essay":
+            # AI grading with essay-focused prompt (not code-focused)
+            grading_result = _call_llm_grader(
+                problem_title=problem_title,
+                problem_description=problem_description,
+                answer_text=sub.get("text_content", ""),
+                system_prompt=ESSAY_GRADING_SYSTEM_PROMPT,
+            )
+        else:
+            # algorithm: existing code grading prompt
+            grading_result = _call_llm_grader(
+                problem_title=problem_title,
+                problem_description=problem_description,
+                answer_text=sub.get("text_content", ""),
+                system_prompt=GRADING_SYSTEM_PROMPT,
+            )
 
         # Save grade
         grade_payload = {
+            "id": str(uuid.uuid4()),
             "submission_id": str(submission_id),
             "score": grading_result["score"],
             "feedback_json": grading_result["feedback_json"],

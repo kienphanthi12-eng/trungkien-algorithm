@@ -70,6 +70,7 @@ export default function CreateProblem() {
   const ptype = formData.problem_type;
   const isMath = ptype === 'multiple_choice' || ptype === 'true_false';
   const isMCQ = ptype === 'multiple_choice';
+  const isEssay = ptype === 'essay';
 
   const handleInput = (e) => {
     const { name, value } = e.target;
@@ -131,7 +132,15 @@ export default function CreateProblem() {
         payload.example_input = '';
         payload.example_output = '';
         if (!isMCQ) { payload.choices = null; }
+      } else if (isEssay) {
+        payload.test_cases = [];
+        payload.example_input = '';
+        payload.example_output = '';
+        payload.choices = null;
+        payload.correct_answer = null;
+        // solution kept (đáp án mẫu cho giáo viên)
       } else {
+        // algorithm
         payload.choices = null;
         payload.correct_answer = null;
         payload.solution = null;
@@ -152,7 +161,7 @@ export default function CreateProblem() {
     }
   };
 
-  const typeLabel = { multiple_choice: 'Trắc nghiệm', true_false: 'Đúng / Sai', algorithm: 'Lập trình' };
+  const typeLabel = { multiple_choice: 'Trắc nghiệm', true_false: 'Đúng / Sai', essay: 'Tự luận', algorithm: 'Lập trình' };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -201,7 +210,7 @@ export default function CreateProblem() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Loại bài toán</label>
                 <div className="flex gap-3">
-                  {['multiple_choice', 'true_false', 'algorithm'].map(t => (
+                  {['multiple_choice', 'true_false', 'essay', 'algorithm'].map(t => (
                     <button key={t} type="button"
                       onClick={() => setFormData(prev => ({ ...prev, problem_type: t }))}
                       className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
@@ -301,18 +310,18 @@ export default function CreateProblem() {
                 </div>
               )}
 
-              {/* Lời giải (math only) */}
-              {isMath && (
+              {/* Lời giải (math + essay) */}
+              {(isMath || isEssay) && (
                 <div className="pb-6 border-b border-gray-200">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Lời giải chi tiết</label>
                   <textarea name="solution" value={formData.solution} onChange={handleInput} rows="4"
                     className="w-full rounded-md border-gray-300 shadow-sm border p-2 text-sm focus:border-blue-500 focus:outline-none"
-                    placeholder="Hướng dẫn giải từng bước... (chỉ giáo viên thấy)" />
+                    placeholder={isEssay ? "Lời giải mẫu để giáo viên tham khảo khi chấm bài... (chỉ giáo viên thấy)" : "Hướng dẫn giải từng bước... (chỉ giáo viên thấy)"} />
                 </div>
               )}
 
               {/* Algorithm: ví dụ + test cases */}
-              {!isMath && (
+              {!isMath && !isEssay && (
                 <>
                   <div className="space-y-4 pb-6 border-b border-gray-200">
                     <h2 className="text-lg font-semibold text-gray-900">Ví dụ</h2>
@@ -402,7 +411,7 @@ export default function CreateProblem() {
 
             <textarea value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)} rows="4" disabled={aiLoading}
               className="w-full rounded-lg border border-gray-300 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none mb-3"
-              placeholder="VD: Câu trắc nghiệm về đạo hàm hàm hợp, mức trung bình&#10;VD: Bài toán hình học - tính thể tích khối chóp S.ABC, khó&#10;VD: Bài đúng/sai về giới hạn dãy số&#10;VD: Bài lập trình tìm ƯCLN hai số (thuật toán Euclid)" />
+              placeholder="VD: Câu trắc nghiệm về đạo hàm hàm hợp, mức trung bình&#10;VD: Bài tự luận tính tích phân, mức khó&#10;VD: Bài đúng/sai về giới hạn dãy số&#10;VD: Bài lập trình tìm ƯCLN hai số (thuật toán Euclid)" />
 
             {aiError && <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{aiError}</div>}
 

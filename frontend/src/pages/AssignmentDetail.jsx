@@ -326,8 +326,25 @@ export default function AssignmentDetail() {
                     </button>
                   </div>
                 </div>
+              ) : problem?.problem_type === 'essay' ? (
+                /* Tự luận: textarea không mono */
+                <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
+                  {submitError && <div className="p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">{submitError}</div>}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Bài làm của bạn <span className="text-red-500">*</span></label>
+                    <textarea value={answerText} onChange={(e) => setAnswerText(e.target.value)} rows={12}
+                      placeholder="Trình bày lời giải chi tiết của bạn tại đây..."
+                      className="w-full rounded-md border border-gray-300 p-3 text-sm focus:border-blue-500 resize-y" required />
+                  </div>
+                  <div className="flex justify-end">
+                    <button type="submit" disabled={submitting}
+                      className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 font-medium">
+                      {submitting ? 'Đang nộp...' : '📤 Nộp bài'}
+                    </button>
+                  </div>
+                </form>
               ) : (
-                /* Algorithm: textarea */
+                /* Algorithm: textarea mono */
                 <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
                   {submitError && <div className="p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">{submitError}</div>}
                   <div>
@@ -355,9 +372,32 @@ export default function AssignmentDetail() {
                 <span className="text-xs text-gray-500">Nộp lúc: {formatDate(submission.submitted_at)}</span>
               </div>
               <div className="px-6 py-5">
-                <pre className="bg-gray-50 border border-gray-200 rounded p-4 text-sm font-mono whitespace-pre-wrap overflow-x-auto max-h-80 overflow-y-auto">
-                  {submission.text_content || '(Không có nội dung)'}
-                </pre>
+                {problem?.problem_type === 'multiple_choice' ? (
+                  <div className="flex items-center gap-3 py-2">
+                    <span className="text-sm text-gray-600">Đáp án đã chọn:</span>
+                    <span className="w-10 h-10 flex items-center justify-center rounded-full bg-blue-600 text-white font-bold text-lg">
+                      {submission.text_content?.toUpperCase()}
+                    </span>
+                    {problem?.choices?.[submission.text_content?.toUpperCase()] && (
+                      <span className="text-sm text-gray-800">{problem.choices[submission.text_content.toUpperCase()]}</span>
+                    )}
+                  </div>
+                ) : problem?.problem_type === 'true_false' ? (
+                  <div className="flex items-center gap-3 py-2">
+                    <span className="text-sm text-gray-600">Đáp án đã chọn:</span>
+                    <span className={`px-4 py-2 rounded-lg font-bold text-sm ${submission.text_content === 'true' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                      {submission.text_content === 'true' ? '✓ ĐÚNG' : '✗ SAI'}
+                    </span>
+                  </div>
+                ) : problem?.problem_type === 'essay' ? (
+                  <div className="bg-gray-50 border border-gray-200 rounded p-4 text-sm text-gray-800 whitespace-pre-wrap max-h-80 overflow-y-auto leading-relaxed">
+                    {submission.text_content || '(Không có nội dung)'}
+                  </div>
+                ) : (
+                  <pre className="bg-gray-50 border border-gray-200 rounded p-4 text-sm font-mono whitespace-pre-wrap overflow-x-auto max-h-80 overflow-y-auto">
+                    {submission.text_content || '(Không có nội dung)'}
+                  </pre>
+                )}
               </div>
 
               {/* Teacher: Grade button */}
@@ -377,13 +417,15 @@ export default function AssignmentDetail() {
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
                         </svg>
-                        Đang chấm bài (AI)...
+                        Đang chấm...
                       </>
+                    ) : (problem?.problem_type === 'multiple_choice' || problem?.problem_type === 'true_false') ? (
+                      <>⚡ {grade ? 'Chấm lại (tự động)' : 'Chấm tự động'}</>
                     ) : (
                       <>🤖 {grade ? 'Chấm lại bằng AI' : 'Chấm bài bằng AI'}</>
                     )}
                   </button>
-                  {grading && (
+                  {grading && problem?.problem_type !== 'multiple_choice' && problem?.problem_type !== 'true_false' && (
                     <p className="mt-2 text-xs text-gray-500">Đang gọi AI chấm bài, có thể mất 10-30 giây...</p>
                   )}
                 </div>
@@ -420,6 +462,7 @@ export default function AssignmentDetail() {
                           correctness: 'Tính đúng đắn',
                           clarity: 'Rõ ràng',
                           efficiency: 'Hiệu quả',
+                          completeness: 'Đầy đủ',
                         };
                         return (
                           <div key={key} className="bg-gray-50 rounded-lg p-3 border border-gray-200">
@@ -440,7 +483,9 @@ export default function AssignmentDetail() {
                   <p className="text-xs text-gray-400 text-right">
                     {grade.feedback_json?.model && (
                       <span className="mr-3 px-2 py-0.5 bg-gray-100 rounded text-gray-500">
-                        {grade.feedback_json.model === 'deepseek-chat' ? '🔵 DeepSeek' : '🟣 Claude Haiku'}
+                        {grade.feedback_json.model === 'auto' ? '⚡ Tự động'
+                          : grade.feedback_json.model === 'deepseek-chat' ? '🔵 DeepSeek'
+                          : '🟣 Claude Haiku'}
                       </span>
                     )}
                     {grade.llm_cost > 0 && `Chi phí: $${grade.llm_cost.toFixed(6)}`}

@@ -53,6 +53,23 @@ Nếu là bài ĐÚNG/SAI TOÁN (true_false), dùng:
   "memory_limit": 256
 }
 
+Nếu là bài TỰ LUẬN (essay), dùng:
+{
+  "problem_type": "essay",
+  "title": "...",
+  "description": "Đề bài tự luận đầy đủ, rõ ràng",
+  "difficulty": "...",
+  "category": "Giải tích | Hình học | Đại số | Vật lý | Hóa học | ...",
+  "choices": null,
+  "correct_answer": null,
+  "solution": "Lời giải mẫu chi tiết từng bước (giáo viên dùng để chấm)",
+  "example_input": "",
+  "example_output": "",
+  "test_cases": [],
+  "time_limit": 1000,
+  "memory_limit": 256
+}
+
 Nếu là bài LẬP TRÌNH (algorithm), dùng:
 {
   "problem_type": "algorithm",

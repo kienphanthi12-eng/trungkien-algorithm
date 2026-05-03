@@ -211,18 +211,27 @@ export default function ProblemDetail() {
                 )}
               </div>
               <div className="flex flex-wrap gap-2 mt-4">
+                {/* Type badge */}
+                {{
+                  multiple_choice: <span key="type" className="inline-block px-3 py-1 text-sm font-medium rounded bg-indigo-100 text-indigo-800">📋 Trắc nghiệm</span>,
+                  true_false: <span key="type" className="inline-block px-3 py-1 text-sm font-medium rounded bg-indigo-100 text-indigo-800">✓✗ Đúng / Sai</span>,
+                  essay: <span key="type" className="inline-block px-3 py-1 text-sm font-medium rounded bg-indigo-100 text-indigo-800">✍️ Tự luận</span>,
+                  algorithm: <span key="type" className="inline-block px-3 py-1 text-sm font-medium rounded bg-indigo-100 text-indigo-800">💻 Lập trình</span>,
+                }[problem.problem_type || 'algorithm']}
                 <span className={`inline-block px-3 py-1 text-sm font-medium rounded ${getDifficultyColor(problem.difficulty)}`}>
                   {problem.difficulty === 'easy' ? 'Dễ' : problem.difficulty === 'medium' ? 'Trung bình' : 'Khó'}
                 </span>
                 <span className="inline-block px-3 py-1 text-sm font-medium rounded bg-blue-100 text-blue-800">
                   {problem.category}
                 </span>
-                <span className="inline-block px-3 py-1 text-sm font-medium rounded bg-purple-100 text-purple-800">
-                  ⏱️ {problem.time_limit}ms
-                </span>
-                <span className="inline-block px-3 py-1 text-sm font-medium rounded bg-orange-100 text-orange-800">
-                  💾 {problem.memory_limit}MB
-                </span>
+                {(!problem.problem_type || problem.problem_type === 'algorithm') && <>
+                  <span className="inline-block px-3 py-1 text-sm font-medium rounded bg-purple-100 text-purple-800">
+                    ⏱️ {problem.time_limit}ms
+                  </span>
+                  <span className="inline-block px-3 py-1 text-sm font-medium rounded bg-orange-100 text-orange-800">
+                    💾 {problem.memory_limit}MB
+                  </span>
+                </>}
               </div>
             </div>
 
