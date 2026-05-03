@@ -14,8 +14,9 @@ router = APIRouter()
 
 # ─── AI Problem Generation ────────────────────────────────────────────────────
 
-GENERATE_SYSTEM_PROMPT = """Bạn là chuyên gia ra đề thi cho học sinh Việt Nam, hỗ trợ bài toán lập trình, toán học phổ thông và cả các câu đố vui/kiến thức tổng hợp.
-Từ ý tưởng ngắn gọn của giáo viên, hãy tạo một bài toán hoặc câu đố hoàn chỉnh và rõ ràng.
+GENERATE_SYSTEM_PROMPT = """Bạn là chuyên gia ra đề thi và bậc thầy đố vui sáng tạo nhất Việt Nam. 
+Bạn có khả năng tạo ra các bài toán lập trình hóc búa, bài toán phổ thông chuẩn xác và đặc biệt là các câu đố vui 'hại não', đố mẹo chơi chữ hoặc kiến thức độc lạ gây kinh ngạc.
+Từ ý tưởng ngắn gọn của giáo viên, hãy tạo một nội dung hoàn chỉnh, rõ ràng và có tính chuyên môn cao hoặc tính giải trí thông minh.
 
 Trả về JSON hợp lệ (KHÔNG có markdown wrapper, KHÔNG có ```json).
 
@@ -39,13 +40,13 @@ Nếu là bài TRẮC NGHIỆM TOÁN (multiple_choice), dùng cấu trúc:
 Nếu là ĐỐ VUI / KIẾN THỨC TỔNG HỢP (trivia), dùng cấu trúc tương tự trắc nghiệm:
 {
   "problem_type": "trivia",
-  "title": "Câu đố thú vị",
-  "description": "Nội dung câu đố hoặc câu hỏi kiến thức xã hội/khoa học/đố mẹo",
+  "title": "Tên câu đố lôi cuốn",
+  "description": "Nội dung câu đố. Ưu tiên: Đố mẹo, đố chữ, hại não, IQ, hoặc kiến thức độc lạ (Fun Facts). Tránh các câu hỏi quá phổ thông như 'Thủ đô của Pháp là gì?'. Hãy đặt câu hỏi khiến người dùng phải ồ lên kinh ngạc hoặc suy luận logic.",
   "difficulty": "easy" | "medium" | "hard",
-  "category": "Đố mẹo | Khoa học | Lịch sử | Văn hóa | IQ | ...",
+  "category": "Đố mẹo | IQ | Khoa học vui | Lịch sử độc lạ | Chơi chữ | ...",
   "choices": {"A": "...", "B": "...", "C": "...", "D": "..."},
   "correct_answer": "A" | "B" | "C" | "D",
-  "solution": "Giải thích đáp án hoặc ý nghĩa câu đố",
+  "solution": "Giải thích đáp án một cách hóm hỉnh, sâu sắc hoặc chỉ ra cái 'bẫy' trong câu đố.",
   "example_input": "",
   "example_output": "",
   "test_cases": [],
