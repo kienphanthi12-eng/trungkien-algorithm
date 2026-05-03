@@ -12,8 +12,8 @@ export default function Exams() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    loadExams();
-  }, []);
+    if (token) loadExams();
+  }, [token]);
 
   const loadExams = async () => {
     setLoading(true);

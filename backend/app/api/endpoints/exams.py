@@ -12,54 +12,96 @@ router = APIRouter()
 def health_check():
     return {"status": "ok", "module": "exams"}
 
+def _enrich_exams(exams_data: list) -> list:
+    """Fetch exam_problems + problems for each exam and merge."""
+    if not exams_data:
+        return []
+    result = []
+    for exam in exams_data:
+        enriched = dict(exam)
+        try:
+            ep_resp = (
+                supabase_client.table("exam_problems")
+                .select("*")
+                .eq("exam_id", str(exam["id"]))
+                .order("order_index")
+                .execute()
+            )
+            ep_list = ep_resp.data or []
+            problem_ids = [ep["problem_id"] for ep in ep_list if ep.get("problem_id")]
+            problems_map: dict = {}
+            if problem_ids:
+                prob_resp = (
+                    supabase_client.table("problems")
+                    .select("*")
+                    .in_("id", problem_ids)
+                    .execute()
+                )
+                for p in prob_resp.data or []:
+                    problems_map[p["id"]] = p
+            for ep in ep_list:
+                ep["problem"] = problems_map.get(str(ep.get("problem_id") or ""))
+            enriched["problems"] = ep_list
+        except Exception:
+            enriched["problems"] = []
+        result.append(enriched)
+    return result
+
+
 @router.get("/", response_model=ExamList)
 def get_exams(
     skip: int = Query(0, ge=0),
     limit: int = Query(10, ge=1, le=100),
-    current_user = Depends(get_current_user)
+    current_user=Depends(get_current_user),
 ):
     """Get all exams with pagination"""
     try:
-        # Get total count
         count_response = supabase_client.table("exams").select("*", count="exact").execute()
         total = count_response.count if count_response.count is not None else len(count_response.data or [])
 
-        # Get exams with their problems
-        response = supabase_client.table("exams") \
-            .select("*, problems:exam_problems(*, problem:problems(*))") \
-            .range(skip, skip + limit - 1) \
-            .order("created_at", desc=True) \
+        response = (
+            supabase_client.table("exams")
+            .select("*")
+            .range(skip, skip + limit - 1)
+            .order("created_at", desc=True)
             .execute()
-
-        return {"exams": response.data, "total": total}
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Lỗi khi tải danh sách đề thi: {str(e)}"
         )
 
-@router.get("/{exam_id}", response_model=Exam)
-def get_exam(exam_id: UUID, current_user = Depends(get_current_user)):
-    """Get a specific exam with its problems"""
-    try:
-        response = supabase_client.table("exams") \
-            .select("*, problems:exam_problems(*, problem:problems(*))") \
-            .eq("id", str(exam_id)) \
-            .execute()
-
-        if not response.data:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Không tìm thấy đề thi này."
-            )
-
-        return response.data[0]
+        enriched = _enrich_exams(response.data or [])
+        return {"exams": enriched, "total": total}
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Lỗi khi tải đề thi: {str(e)}"
+            detail=f"Lỗi khi tải danh sách đề thi: {str(e)}",
+        )
+
+@router.get("/{exam_id}", response_model=Exam)
+def get_exam(exam_id: UUID, current_user=Depends(get_current_user)):
+    """Get a specific exam with its problems"""
+    try:
+        response = (
+            supabase_client.table("exams")
+            .select("*")
+            .eq("id", str(exam_id))
+            .execute()
+        )
+
+        if not response.data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Không tìm thấy đề thi này.",
+            )
+
+        enriched = _enrich_exams([response.data[0]])
+        return enriched[0]
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Lỗi khi tải đề thi: {str(e)}",
         )
 
 @router.post("/", status_code=status.HTTP_201_CREATED, response_model=Exam)
@@ -94,8 +136,9 @@ def create_exam(
                 })
             supabase_client.table("exam_problems").insert(exam_problems).execute()
 
-        # Return full exam
-        return get_exam(exam_id, current_user)
+        # Return full exam with enriched problems
+        enriched = _enrich_exams([{"id": exam_id, **exam_response.data[0]}])
+        return enriched[0]
     except HTTPException:
         raise
     except Exception as e:

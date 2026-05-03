@@ -209,27 +209,37 @@ export async function updateProblem(token, problemId, problemData) {
   return response.json();
 }
 
+// Helper: parse error detail safely
+async function _parseError(response, fallback) {
+  try {
+    const err = await response.json();
+    return err.detail || fallback;
+  } catch {
+    return `${fallback} (HTTP ${response.status})`;
+  }
+}
+
 // Exam API functions
 export async function getExams(token, skip = 0, limit = 10) {
+  if (!token) throw new Error('Chưa đăng nhập');
   const response = await fetch(`${API_BASE_URL}/exams/?skip=${skip}&limit=${limit}`, {
     method: 'GET',
     headers: { 'Authorization': `Bearer ${token}` },
   });
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.detail || 'Lỗi khi tải danh sách đề thi');
+    throw new Error(await _parseError(response, 'Lỗi khi tải danh sách đề thi'));
   }
   return response.json();
 }
 
 export async function getExam(token, examId) {
+  if (!token) throw new Error('Chưa đăng nhập');
   const response = await fetch(`${API_BASE_URL}/exams/${examId}`, {
     method: 'GET',
     headers: { 'Authorization': `Bearer ${token}` },
   });
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.detail || 'Lỗi khi tải đề thi');
+    throw new Error(await _parseError(response, 'Lỗi khi tải đề thi'));
   }
   return response.json();
 }
@@ -244,8 +254,7 @@ export async function createExam(token, examData) {
     body: JSON.stringify(examData),
   });
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.detail || 'Lỗi khi tạo đề thi');
+    throw new Error(await _parseError(response, 'Lỗi khi tạo đề thi'));
   }
   return response.json();
 }
@@ -256,8 +265,7 @@ export async function deleteExam(token, examId) {
     headers: { 'Authorization': `Bearer ${token}` },
   });
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.detail || 'Lỗi khi xóa đề thi');
+    throw new Error(await _parseError(response, 'Lỗi khi xóa đề thi'));
   }
   return response.json();
 }
