@@ -21,12 +21,13 @@ def _get_user_role(user_id: str) -> str:
 
 
 def _enrich_assignments(assignments_data: list) -> list:
-    """Batch-fetch problem titles and student info, merge into assignment dicts."""
+    """Batch-fetch problem/exam titles and student info, merge into assignment dicts."""
     if not assignments_data:
         return []
 
-    problem_ids = list({a["problem_id"] for a in assignments_data})
-    student_ids = list({a["student_id"] for a in assignments_data})
+    problem_ids = list({a["problem_id"] for a in assignments_data if a.get("problem_id")})
+    exam_ids = list({a["exam_id"] for a in assignments_data if a.get("exam_id")})
+    student_ids = list({a["student_id"] for a in assignments_data if a.get("student_id")})
 
     problems_map: dict = {}
     if problem_ids:
@@ -34,6 +35,15 @@ def _enrich_assignments(assignments_data: list) -> list:
             prob_resp = supabase_client.table("problems").select("id,title").in_("id", problem_ids).execute()
             for p in prob_resp.data or []:
                 problems_map[p["id"]] = p["title"]
+        except Exception:
+            pass
+
+    exams_map: dict = {}
+    if exam_ids:
+        try:
+            exam_resp = supabase_client.table("exams").select("id,title").in_("id", exam_ids).execute()
+            for e in exam_resp.data or []:
+                exams_map[e["id"]] = e["title"]
         except Exception:
             pass
 
@@ -49,8 +59,9 @@ def _enrich_assignments(assignments_data: list) -> list:
     result = []
     for a in assignments_data:
         enriched = dict(a)
-        enriched["problem_title"] = problems_map.get(str(a.get("problem_id", "")), "")
-        student_info = students_map.get(str(a.get("student_id", "")), {})
+        enriched["problem_title"] = problems_map.get(str(a.get("problem_id") or ""), "")
+        enriched["exam_title"] = exams_map.get(str(a.get("exam_id") or ""), "")
+        student_info = students_map.get(str(a.get("student_id") or ""), {})
         enriched["student_name"] = student_info.get("name", "")
         enriched["student_email"] = student_info.get("email", "")
         result.append(enriched)
@@ -78,26 +89,42 @@ def create_assignment(
                 detail="Học sinh này không thuộc lớp của bạn.",
             )
 
-        # Verify problem exists
-        prob_check = (
-            supabase_client.table("problems")
-            .select("id")
-            .eq("id", str(assignment_in.problem_id))
-            .execute()
-        )
-        if not prob_check.data:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Không tìm thấy bài toán.",
+        # Verify problem or exam exists
+        if assignment_in.problem_id:
+            prob_check = (
+                supabase_client.table("problems")
+                .select("id")
+                .eq("id", str(assignment_in.problem_id))
+                .execute()
             )
+            if not prob_check.data:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Không tìm thấy bài toán.",
+                )
+        elif assignment_in.exam_id:
+            exam_check = (
+                supabase_client.table("exams")
+                .select("id")
+                .eq("id", str(assignment_in.exam_id))
+                .execute()
+            )
+            if not exam_check.data:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Không tìm thấy đề thi.",
+                )
 
         payload: dict = {
             "id": str(uuid.uuid4()),
             "teacher_id": str(current_user.id),
             "student_id": str(assignment_in.student_id),
-            "problem_id": str(assignment_in.problem_id),
             "status": "pending",
         }
+        if assignment_in.problem_id:
+            payload["problem_id"] = str(assignment_in.problem_id)
+        if assignment_in.exam_id:
+            payload["exam_id"] = str(assignment_in.exam_id)
         if assignment_in.due_date:
             payload["due_date"] = assignment_in.due_date.isoformat()
 
