@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { login, getMe } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
+import logo from '../assets/logo.png';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -53,7 +54,7 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
       <div className="max-w-md w-full bg-white p-8 rounded-lg shadow-md">
         <div className="flex justify-center mb-4">
-          <img src="/logo.png" alt="ZENTUS Logo" className="h-16 w-auto" />
+          <img src={logo} alt="ZENTUS Logo" className="h-16 w-auto" />
         </div>
         <h2 className="text-2xl font-bold text-center mb-6 text-gray-800">Đăng Nhập</h2>
         {error && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4 text-sm">{error}</div>}

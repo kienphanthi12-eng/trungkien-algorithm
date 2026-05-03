@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { getStudents, addStudent, removeStudent } from '../services/api';
 import { Link } from 'react-router-dom';
+import logo from '../assets/logo.png';
 
 export default function Students() {
   const { user, token, logoutUser } = useAuth();
@@ -70,7 +71,7 @@ export default function Students() {
           <div className="flex justify-between h-16 items-center">
             <div className="flex items-center">
               <Link to="/" className="flex items-center gap-2 mr-8">
-                <img src="/logo.png" alt="ZENTUS" className="h-10 w-auto" />
+                <img src={logo} alt="ZENTUS" className="h-10 w-auto" />
               </Link>
               <div className="hidden md:block">
                 <Link to="/" className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">Dashboard</Link>

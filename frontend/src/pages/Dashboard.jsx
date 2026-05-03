@@ -1,5 +1,6 @@
 import { useAuth } from '../contexts/AuthContext';
 import { Link } from 'react-router-dom';
+import logo from '../assets/logo.png';
 
 export default function Dashboard() {
   const { user, logoutUser } = useAuth();
@@ -11,7 +12,7 @@ export default function Dashboard() {
           <div className="flex justify-between h-16 items-center">
               <div className="flex items-center gap-2">
                 <img 
-                  src="/logo.png" 
+                  src={logo} 
                   alt="ZENTUS Logo"                   className="h-10 w-auto"
                   onError={(e) => {
                     e.target.onerror = null; 
