@@ -19,7 +19,7 @@ class ProblemBase(BaseModel):
     time_limit: Optional[int] = 1000
     memory_limit: Optional[int] = 256
     # Math exam fields
-    problem_type: Optional[str] = "algorithm"  # algorithm | multiple_choice | true_false
+    problem_type: Optional[str] = "algorithm"  # algorithm | multiple_choice | true_false | trivia | essay
     choices: Optional[Dict[str, str]] = None   # {"A": "...", "B": "...", "C": "...", "D": "..."}
     correct_answer: Optional[str] = None       # "A"/"B"/"C"/"D" or "true"/"false"
     solution: Optional[str] = None             # Lời giải chi tiết

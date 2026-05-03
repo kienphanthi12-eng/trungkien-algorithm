@@ -14,8 +14,8 @@ router = APIRouter()
 
 # ─── AI Problem Generation ────────────────────────────────────────────────────
 
-GENERATE_SYSTEM_PROMPT = """Bạn là chuyên gia ra đề thi cho học sinh Việt Nam, hỗ trợ cả bài toán lập trình lẫn toán học phổ thông.
-Từ ý tưởng ngắn gọn của giáo viên, hãy tạo một bài toán lập trình hoàn chỉnh và rõ ràng.
+GENERATE_SYSTEM_PROMPT = """Bạn là chuyên gia ra đề thi cho học sinh Việt Nam, hỗ trợ bài toán lập trình, toán học phổ thông và cả các câu đố vui/kiến thức tổng hợp.
+Từ ý tưởng ngắn gọn của giáo viên, hãy tạo một bài toán hoặc câu đố hoàn chỉnh và rõ ràng.
 
 Trả về JSON hợp lệ (KHÔNG có markdown wrapper, KHÔNG có ```json).
 
@@ -29,6 +29,23 @@ Nếu là bài TRẮC NGHIỆM TOÁN (multiple_choice), dùng cấu trúc:
   "choices": {"A": "...", "B": "...", "C": "...", "D": "..."},
   "correct_answer": "A" | "B" | "C" | "D",
   "solution": "Lời giải chi tiết từng bước",
+  "example_input": "",
+  "example_output": "",
+  "test_cases": [],
+  "time_limit": 1000,
+  "memory_limit": 256
+}
+
+Nếu là ĐỐ VUI / KIẾN THỨC TỔNG HỢP (trivia), dùng cấu trúc tương tự trắc nghiệm:
+{
+  "problem_type": "trivia",
+  "title": "Câu đố thú vị",
+  "description": "Nội dung câu đố hoặc câu hỏi kiến thức xã hội/khoa học/đố mẹo",
+  "difficulty": "easy" | "medium" | "hard",
+  "category": "Đố mẹo | Khoa học | Lịch sử | Văn hóa | IQ | ...",
+  "choices": {"A": "...", "B": "...", "C": "...", "D": "..."},
+  "correct_answer": "A" | "B" | "C" | "D",
+  "solution": "Giải thích đáp án hoặc ý nghĩa câu đố",
   "example_input": "",
   "example_output": "",
   "test_cases": [],
@@ -92,7 +109,7 @@ QUY TẮC CHUNG:
 - Dùng ký hiệu unicode cho toán học: ², ³, √, ≤, ≥, ≠, ≈, π, ∞, ∈, ∉, ∀, ∃
 - description dùng \\n để xuống dòng
 - Các phương án A/B/C/D phải có một đáp án đúng duy nhất
-- Lời giải (solution) phải chi tiết, đúng toán học
+- Lời giải (solution) phải chi tiết, đúng đắn
 - Chỉ trả về JSON thuần túy"""
 
 

@@ -246,7 +246,7 @@ def _call_llm_grader(problem_title: str, problem_description: str, answer_text: 
 
 def _auto_grade_objective(problem_type: str, correct_answer: str, student_answer: str) -> dict:
     """Instant auto-grading for multiple_choice and true_false — no AI needed."""
-    if problem_type == "multiple_choice":
+    if problem_type in ("multiple_choice", "trivia"):
         sa = student_answer.strip().upper()
         ca = (correct_answer or "").strip().upper()
     else:  # true_false
@@ -255,8 +255,8 @@ def _auto_grade_objective(problem_type: str, correct_answer: str, student_answer
 
     is_correct = sa == ca
     score = 10.0 if is_correct else 0.0
-    display_answer = sa if problem_type == "multiple_choice" else ("Đúng" if sa == "true" else "Sai")
-    display_correct = ca if problem_type == "multiple_choice" else ("Đúng" if ca == "true" else "Sai")
+    display_answer = sa if problem_type in ("multiple_choice", "trivia") else ("Đúng" if sa == "true" else "Sai")
+    display_correct = ca if problem_type in ("multiple_choice", "trivia") else ("Đúng" if ca == "true" else "Sai")
 
     return {
         "score": score,
