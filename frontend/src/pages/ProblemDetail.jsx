@@ -3,6 +3,59 @@ import { useAuth } from '../contexts/AuthContext';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { getProblem, getStudents, createAssignment } from '../services/api';
 
+// Simple description renderer — converts markdown-ish text to formatted JSX
+function DescriptionRenderer({ text }) {
+  if (!text) return null;
+  const lines = text.split('\n');
+  const result = [];
+
+  lines.forEach((line, i) => {
+    const trimmed = line.trim();
+
+    if (trimmed === '') {
+      result.push(<div key={i} className="h-3" />);
+    } else if (/^\s{2,}[+\-*]\s/.test(line)) {
+      // Indented sub-bullet (e.g. "  + ..." or "   - ...")
+      const content = line.replace(/^\s+[+\-*]\s/, '');
+      result.push(
+        <div key={i} className="flex gap-2 ml-8 text-gray-700">
+          <span className="text-gray-400 select-none mt-0.5">◦</span>
+          <span>{content}</span>
+        </div>
+      );
+    } else if (/^[+\-*]\s/.test(trimmed)) {
+      // Top-level bullet
+      const content = trimmed.replace(/^[+\-*]\s/, '');
+      result.push(
+        <div key={i} className="flex gap-2 ml-4 text-gray-700">
+          <span className="text-blue-400 select-none mt-0.5">•</span>
+          <span>{content}</span>
+        </div>
+      );
+    } else if (/^\d+\.\s/.test(trimmed)) {
+      // Numbered list
+      result.push(
+        <div key={i} className="flex gap-2 ml-4 text-gray-700">
+          <span className="text-blue-500 font-medium select-none min-w-[20px]">{trimmed.match(/^\d+/)[0]}.</span>
+          <span>{trimmed.replace(/^\d+\.\s/, '')}</span>
+        </div>
+      );
+    } else if (/^#{1,3}\s/.test(trimmed)) {
+      // Heading
+      const content = trimmed.replace(/^#{1,3}\s/, '');
+      result.push(
+        <p key={i} className="font-semibold text-gray-900 mt-2">{content}</p>
+      );
+    } else {
+      result.push(
+        <p key={i} className="text-gray-700 leading-relaxed">{line}</p>
+      );
+    }
+  });
+
+  return <div className="space-y-1">{result}</div>;
+}
+
 export default function ProblemDetail() {
   const { user, token, logoutUser } = useAuth();
   const { problemId } = useParams();
@@ -175,10 +228,54 @@ export default function ProblemDetail() {
 
             {/* Description */}
             <div className="mb-6 pb-6 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900 mb-2">Mô tả</h2>
-              <p className="text-gray-700 whitespace-pre-wrap">{problem.description}</p>
+              <h2 className="text-lg font-semibold text-gray-900 mb-3">Đề bài</h2>
+              <DescriptionRenderer text={problem.description} />
             </div>
 
+            {/* MCQ choices */}
+            {problem.problem_type === 'multiple_choice' && problem.choices && (
+              <div className="mb-6 pb-6 border-b border-gray-200">
+                <h2 className="text-lg font-semibold text-gray-900 mb-3">Phương án</h2>
+                <div className="space-y-2">
+                  {['A', 'B', 'C', 'D'].map(k => {
+                    const isCorrect = user?.role === 'teacher' && problem.correct_answer === k;
+                    return problem.choices[k] ? (
+                      <div key={k} className={`flex items-start gap-3 p-3 rounded-lg border ${isCorrect ? 'bg-green-50 border-green-300' : 'bg-gray-50 border-gray-200'}`}>
+                        <span className={`w-7 h-7 flex items-center justify-center rounded-full text-sm font-bold shrink-0 mt-0.5 ${isCorrect ? 'bg-green-500 text-white' : 'bg-white border border-gray-300 text-gray-700'}`}>{k}</span>
+                        <span className="text-gray-800 text-sm">{problem.choices[k]}</span>
+                        {isCorrect && <span className="ml-auto text-green-600 text-xs font-semibold shrink-0">✓ Đáp án đúng</span>}
+                      </div>
+                    ) : null;
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* True/False answer (teacher only) */}
+            {problem.problem_type === 'true_false' && user?.role === 'teacher' && problem.correct_answer && (
+              <div className="mb-6 pb-6 border-b border-gray-200">
+                <h2 className="text-lg font-semibold text-gray-900 mb-2">Đáp án</h2>
+                <span className={`inline-block px-4 py-2 rounded-lg font-semibold text-sm ${problem.correct_answer === 'true' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                  {problem.correct_answer === 'true' ? '✓ Đúng' : '✗ Sai'}
+                </span>
+              </div>
+            )}
+
+            {/* Solution (teacher only) */}
+            {user?.role === 'teacher' && problem.solution && (
+              <div className="mb-6 pb-6 border-b border-gray-200">
+                <h2 className="text-lg font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                  💡 Lời giải <span className="text-xs font-normal text-gray-400">(chỉ giáo viên thấy)</span>
+                </h2>
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                  <DescriptionRenderer text={problem.solution} />
+                </div>
+              </div>
+            )}
+
+            {/* Algorithm: example + test cases */}
+            {(!problem.problem_type || problem.problem_type === 'algorithm') && (
+            <>
             {/* Example */}
             <div className="mb-6 pb-6 border-b border-gray-200">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Ví dụ</h2>
@@ -197,32 +294,45 @@ export default function ProblemDetail() {
                 </div>
               </div>
             </div>
+            </>
+            )}
 
-            {/* Test Cases */}
-            <div className="mb-6 pb-6 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Test Cases ({problem.test_cases.length})</h2>
-              <div className="space-y-4">
-                {problem.test_cases.map((testCase, idx) => (
-                  <div key={idx} className="border border-gray-200 rounded p-4">
-                    <h3 className="text-sm font-medium text-gray-900 mb-2">Test Case #{idx + 1}</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <p className="text-xs font-medium text-gray-600 mb-1">Input:</p>
-                        <div className="bg-gray-100 p-2 rounded text-sm text-gray-700 font-mono overflow-x-auto">
-                          {testCase.input}
+            {/* Test Cases — chỉ hiện cho bài lập trình, và chỉ giáo viên thấy đáp án */}
+            {(!problem.problem_type || problem.problem_type === 'algorithm') && user?.role === 'teacher' ? (
+              <div className="mb-6 pb-6 border-b border-gray-200">
+                <h2 className="text-lg font-semibold text-gray-900 mb-1">
+                  Test Cases ({problem.test_cases.length})
+                </h2>
+                <p className="text-xs text-gray-400 mb-4">🔒 Chỉ giáo viên thấy phần này</p>
+                <div className="space-y-4">
+                  {problem.test_cases.map((testCase, idx) => (
+                    <div key={idx} className="border border-gray-200 rounded p-4">
+                      <h3 className="text-sm font-medium text-gray-900 mb-2">Test Case #{idx + 1}</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-xs font-medium text-gray-600 mb-1">Input:</p>
+                          <div className="bg-gray-100 p-2 rounded text-sm text-gray-700 font-mono overflow-x-auto whitespace-pre">
+                            {testCase.input}
+                          </div>
                         </div>
-                      </div>
-                      <div>
-                        <p className="text-xs font-medium text-gray-600 mb-1">Output:</p>
-                        <div className="bg-gray-100 p-2 rounded text-sm text-gray-700 font-mono overflow-x-auto">
-                          {testCase.output}
+                        <div>
+                          <p className="text-xs font-medium text-gray-600 mb-1">Output:</p>
+                          <div className="bg-gray-100 p-2 rounded text-sm text-gray-700 font-mono overflow-x-auto whitespace-pre">
+                            {testCase.output}
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
+            ) : (!problem.problem_type || problem.problem_type === 'algorithm') ? (
+              <div className="mb-6 pb-6 border-b border-gray-200">
+                <p className="text-sm text-gray-500 italic">
+                  🔒 Test cases được ẩn — {problem.test_cases?.length || 0} test case sẽ được dùng để chấm bài.
+                </p>
+              </div>
+            ) : null}
 
             {/* Teacher action buttons */}
             {user?.role === 'teacher' && problem.created_by === user.id && (

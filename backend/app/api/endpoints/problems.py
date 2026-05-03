@@ -4,6 +4,7 @@ from uuid import UUID
 import json
 import os
 import httpx
+import uuid
 from pydantic import BaseModel
 from app.services.supabase_client import supabase_client
 from app.api.dependencies import get_current_user, get_current_teacher
@@ -13,31 +14,68 @@ router = APIRouter()
 
 # ─── AI Problem Generation ────────────────────────────────────────────────────
 
-GENERATE_SYSTEM_PROMPT = """Bạn là chuyên gia ra đề thi lập trình cho học sinh Việt Nam.
-Từ ý tưởng ngắn gọn của giáo viên, hãy tạo một bài toán lập trình hoàn chỉnh.
+GENERATE_SYSTEM_PROMPT = """Bạn là chuyên gia ra đề thi cho học sinh Việt Nam, hỗ trợ cả bài toán lập trình lẫn toán học phổ thông.
+Từ ý tưởng ngắn gọn của giáo viên, hãy tạo một bài toán lập trình hoàn chỉnh và rõ ràng.
 
-Trả về JSON hợp lệ (KHÔNG có markdown, KHÔNG có ```json) với cấu trúc:
+Trả về JSON hợp lệ (KHÔNG có markdown wrapper, KHÔNG có ```json).
+
+Nếu là bài TRẮC NGHIỆM TOÁN (multiple_choice), dùng cấu trúc:
 {
-  "title": "Tên bài toán ngắn gọn",
-  "description": "Mô tả đầy đủ bài toán: đề bài, input/output format, ràng buộc",
+  "problem_type": "multiple_choice",
+  "title": "Câu hỏi ngắn gọn",
+  "description": "Đề bài đầy đủ, viết rõ ràng với ký hiệu toán học dùng unicode (ví dụ: x², √x, ≤, ≥, π, ∞)",
   "difficulty": "easy" | "medium" | "hard",
-  "category": "Chủ đề kỹ thuật (Arrays, Sorting, DP, Greedy, ...)",
-  "example_input": "Input ví dụ minh họa",
-  "example_output": "Output tương ứng",
-  "test_cases": [
-    {"input": "...", "output": "..."},
-    {"input": "...", "output": "..."},
-    {"input": "...", "output": "..."}
-  ],
+  "category": "Giải tích | Hình học | Đại số | Tổ hợp | Xác suất | Lượng giác | ...",
+  "choices": {"A": "...", "B": "...", "C": "...", "D": "..."},
+  "correct_answer": "A" | "B" | "C" | "D",
+  "solution": "Lời giải chi tiết từng bước",
+  "example_input": "",
+  "example_output": "",
+  "test_cases": [],
   "time_limit": 1000,
   "memory_limit": 256
 }
 
-Yêu cầu:
-- description phải rõ ràng, đủ ràng buộc để học sinh giải được
-- Tạo ít nhất 3 test cases (bao gồm edge cases)
-- test_cases phải CHÍNH XÁC (input → output đúng với thuật toán)
-- difficulty phù hợp với mô tả
+Nếu là bài ĐÚNG/SAI TOÁN (true_false), dùng:
+{
+  "problem_type": "true_false",
+  "title": "...",
+  "description": "Mệnh đề toán học cần xác định đúng/sai",
+  "difficulty": "...",
+  "category": "...",
+  "choices": null,
+  "correct_answer": "true" | "false",
+  "solution": "Lời giải/chứng minh",
+  "example_input": "",
+  "example_output": "",
+  "test_cases": [],
+  "time_limit": 1000,
+  "memory_limit": 256
+}
+
+Nếu là bài LẬP TRÌNH (algorithm), dùng:
+{
+  "problem_type": "algorithm",
+  "title": "...",
+  "description": "Đề bài\\n\\nInput:\\n- ...\\n\\nOutput:\\n- ...\\n\\nRàng buộc:\\n- ...",
+  "difficulty": "...",
+  "category": "Arrays | Sorting | DP | Greedy | Math | ...",
+  "choices": null,
+  "correct_answer": null,
+  "solution": null,
+  "example_input": "...",
+  "example_output": "...",
+  "test_cases": [{"input":"...","output":"..."},{"input":"...","output":"..."},{"input":"...","output":"..."}],
+  "time_limit": 1000,
+  "memory_limit": 256
+}
+
+QUY TẮC CHUNG:
+- Viết tiếng Việt đầy đủ dấu
+- Dùng ký hiệu unicode cho toán học: ², ³, √, ≤, ≥, ≠, ≈, π, ∞, ∈, ∉, ∀, ∃
+- description dùng \\n để xuống dòng
+- Các phương án A/B/C/D phải có một đáp án đúng duy nhất
+- Lời giải (solution) phải chi tiết, đúng toán học
 - Chỉ trả về JSON thuần túy"""
 
 
@@ -196,18 +234,27 @@ def create_problem(
 ):
     """Create a new problem (teacher only)"""
     try:
+        ptype = problem_in.problem_type or "algorithm"
         problem_data = {
+            "id": str(uuid.uuid4()),
             "title": problem_in.title,
             "description": problem_in.description,
             "difficulty": problem_in.difficulty,
             "category": problem_in.category,
-            "example_input": problem_in.example_input,
-            "example_output": problem_in.example_output,
-            "test_cases": json.dumps([tc.dict() for tc in problem_in.test_cases]),
-            "time_limit": problem_in.time_limit,
-            "memory_limit": problem_in.memory_limit,
-            "created_by": str(current_user.id)
+            "problem_type": ptype,
+            "example_input": problem_in.example_input or "",
+            "example_output": problem_in.example_output or "",
+            "test_cases": json.dumps([tc.dict() for tc in (problem_in.test_cases or [])]),
+            "time_limit": problem_in.time_limit or 1000,
+            "memory_limit": problem_in.memory_limit or 256,
+            "created_by": str(current_user.id),
         }
+        if problem_in.choices:
+            problem_data["choices"] = problem_in.choices
+        if problem_in.correct_answer:
+            problem_data["correct_answer"] = problem_in.correct_answer
+        if problem_in.solution:
+            problem_data["solution"] = problem_in.solution
 
         response = supabase_client.table("problems").insert(problem_data).execute()
 

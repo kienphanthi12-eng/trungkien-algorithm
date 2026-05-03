@@ -7,6 +7,7 @@ import {
   createSubmission,
   getSubmissionByAssignment,
   gradeSubmission,
+  getProblem,
 } from '../services/api';
 import { useNavigate } from 'react-router-dom';
 
@@ -36,6 +37,7 @@ export default function AssignmentDetail() {
   const navigate = useNavigate();
 
   const [assignment, setAssignment] = useState(null);
+  const [problem, setProblem] = useState(null);
   const [submission, setSubmission] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -60,8 +62,17 @@ export default function AssignmentDetail() {
         getAssignment(token, assignmentId),
         getSubmissionByAssignment(token, assignmentId),
       ]);
-      if (assignData.status === 'fulfilled') setAssignment(assignData.value);
-      else setError(assignData.reason.message);
+      if (assignData.status === 'fulfilled') {
+        const assign = assignData.value;
+        setAssignment(assign);
+        // Load problem details to know problem_type and choices
+        if (assign.problem_id) {
+          try {
+            const prob = await getProblem(token, assign.problem_id);
+            setProblem(prob);
+          } catch {}
+        }
+      } else setError(assignData.reason.message);
       if (subData.status === 'fulfilled') setSubmission(subData.value);
     } catch (err) {
       setError(err.message);
@@ -263,35 +274,76 @@ export default function AssignmentDetail() {
           {user?.role === 'student' && assignment.status === 'pending' && !submission && (
             <div className="bg-white shadow rounded-lg overflow-hidden mb-6">
               <div className="px-6 py-4 border-b border-gray-200">
-                <h2 className="text-lg font-semibold text-gray-900">📝 Nộp bài</h2>
+                <h2 className="text-lg font-semibold text-gray-900">📝 Làm bài</h2>
               </div>
-              <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
-                {submitError && (
-                  <div className="p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">{submitError}</div>
-                )}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Bài làm của bạn <span className="text-red-500">*</span>
-                  </label>
-                  <textarea
-                    value={answerText}
-                    onChange={(e) => setAnswerText(e.target.value)}
-                    rows={10}
-                    placeholder="Nhập code hoặc lời giải của bạn tại đây..."
-                    className="w-full rounded-md border border-gray-300 p-3 text-sm font-mono focus:border-blue-500 focus:ring-blue-500 resize-y"
-                    required
-                  />
+
+              {/* MCQ: chọn A/B/C/D */}
+              {problem?.problem_type === 'multiple_choice' ? (
+                <div className="px-6 py-5 space-y-3">
+                  {submitError && <div className="p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">{submitError}</div>}
+                  <p className="text-sm text-gray-600 mb-3">Chọn phương án đúng:</p>
+                  {['A', 'B', 'C', 'D'].map(k => problem.choices?.[k] ? (
+                    <button key={k} type="button"
+                      onClick={() => setAnswerText(k)}
+                      className={`w-full flex items-start gap-3 p-3 rounded-lg border text-left transition-colors ${
+                        answerText === k
+                          ? 'bg-blue-600 border-blue-600 text-white'
+                          : 'bg-white border-gray-300 text-gray-800 hover:border-blue-400 hover:bg-blue-50'
+                      }`}>
+                      <span className={`w-7 h-7 flex items-center justify-center rounded-full text-sm font-bold shrink-0 mt-0.5 ${
+                        answerText === k ? 'bg-white text-blue-600' : 'bg-gray-100 text-gray-700'
+                      }`}>{k}</span>
+                      <span className="text-sm">{problem.choices[k]}</span>
+                    </button>
+                  ) : null)}
+                  <div className="flex justify-end pt-2">
+                    <button onClick={handleSubmit} disabled={submitting || !answerText}
+                      className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 font-medium">
+                      {submitting ? 'Đang nộp...' : '📤 Nộp đáp án'}
+                    </button>
+                  </div>
                 </div>
-                <div className="flex justify-end">
-                  <button
-                    type="submit"
-                    disabled={submitting}
-                    className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors font-medium"
-                  >
-                    {submitting ? 'Đang nộp...' : '📤 Nộp bài'}
-                  </button>
+              ) : problem?.problem_type === 'true_false' ? (
+                <div className="px-6 py-5 space-y-3">
+                  {submitError && <div className="p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">{submitError}</div>}
+                  <p className="text-sm text-gray-600 mb-3">Mệnh đề trên là:</p>
+                  <div className="flex gap-4">
+                    {['true', 'false'].map(v => (
+                      <button key={v} type="button" onClick={() => setAnswerText(v)}
+                        className={`flex-1 py-4 rounded-lg text-lg font-bold border transition-colors ${
+                          answerText === v
+                            ? v === 'true' ? 'bg-green-500 text-white border-green-500' : 'bg-red-500 text-white border-red-500'
+                            : 'bg-white border-gray-300 text-gray-700 hover:border-blue-400'
+                        }`}>
+                        {v === 'true' ? '✓ ĐÚNG' : '✗ SAI'}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex justify-end pt-2">
+                    <button onClick={handleSubmit} disabled={submitting || !answerText}
+                      className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 font-medium">
+                      {submitting ? 'Đang nộp...' : '📤 Nộp đáp án'}
+                    </button>
+                  </div>
                 </div>
-              </form>
+              ) : (
+                /* Algorithm: textarea */
+                <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
+                  {submitError && <div className="p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">{submitError}</div>}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Bài làm của bạn <span className="text-red-500">*</span></label>
+                    <textarea value={answerText} onChange={(e) => setAnswerText(e.target.value)} rows={10}
+                      placeholder="Nhập code hoặc lời giải của bạn tại đây..."
+                      className="w-full rounded-md border border-gray-300 p-3 text-sm font-mono focus:border-blue-500 resize-y" required />
+                  </div>
+                  <div className="flex justify-end">
+                    <button type="submit" disabled={submitting}
+                      className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 font-medium">
+                      {submitting ? 'Đang nộp...' : '📤 Nộp bài'}
+                    </button>
+                  </div>
+                </form>
+              )}
             </div>
           )}
 
