@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api.endpoints import auth, students, problems, assignments, submissions
+from app.api.endpoints import auth, students, problems, assignments, submissions, chat
 
 import os
 
@@ -20,7 +20,8 @@ app.include_router(students.router, prefix="/students", tags=["Students"])
 app.include_router(problems.router, prefix="/problems", tags=["Problems"])
 app.include_router(assignments.router, prefix="/assignments", tags=["Assignments"])
 app.include_router(submissions.router, prefix="/submissions", tags=["Submissions"])
+app.include_router(chat.router, prefix="/chat", tags=["Chat"])
 
 @app.get("/")
 def read_root():
-    return {"message": "Welcome to TrungKien Algorithm API Phase 5"}
+    return {"message": "Welcome to TrungKien Algorithm API Phase 6"}

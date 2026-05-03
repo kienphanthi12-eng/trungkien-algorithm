@@ -307,6 +307,23 @@ export async function getSubmission(token, submissionId) {
   return response.json();
 }
 
+// Chat API
+export async function sendChatMessage(token, { assignment_id, message, history }) {
+  const response = await fetch(`${API_BASE_URL}/chat/message`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify({ assignment_id, message, history }),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Lỗi khi gọi AI');
+  }
+  return response.json(); // { reply: "..." }
+}
+
 export async function gradeSubmission(token, submissionId) {
   const response = await fetch(`${API_BASE_URL}/submissions/${submissionId}/grade`, {
     method: 'POST',

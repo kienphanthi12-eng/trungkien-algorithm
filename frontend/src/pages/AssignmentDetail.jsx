@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useParams, Link } from 'react-router-dom';
 import {
@@ -8,6 +8,7 @@ import {
   getSubmissionByAssignment,
   gradeSubmission,
   getProblem,
+  sendChatMessage,
 } from '../services/api';
 import { useNavigate } from 'react-router-dom';
 
@@ -50,6 +51,13 @@ export default function AssignmentDetail() {
   // Grading state
   const [grading, setGrading] = useState(false);
   const [gradeError, setGradeError] = useState('');
+
+  // Chat state
+  const [showChat, setShowChat] = useState(false);
+  const [chatHistory, setChatHistory] = useState([]);
+  const [chatInput, setChatInput] = useState('');
+  const [chatLoading, setChatLoading] = useState(false);
+  const chatBottomRef = useRef(null);
 
   useEffect(() => {
     fetchData();
@@ -126,6 +134,35 @@ export default function AssignmentDetail() {
       setGradeError(err.message);
     } finally {
       setGrading(false);
+    }
+  };
+
+  // Auto-scroll chat to bottom
+  useEffect(() => {
+    if (showChat) chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chatHistory, chatLoading, showChat]);
+
+  const handleChatSend = async () => {
+    const msg = chatInput.trim();
+    if (!msg || chatLoading) return;
+    setChatInput('');
+    const userMsg = { role: 'user', content: msg };
+    setChatHistory(prev => [...prev, userMsg]);
+    setChatLoading(true);
+    try {
+      const res = await sendChatMessage(token, {
+        assignment_id: assignmentId,
+        message: msg,
+        history: chatHistory,
+      });
+      setChatHistory(prev => [...prev, { role: 'assistant', content: res.reply }]);
+    } catch (err) {
+      setChatHistory(prev => [...prev, {
+        role: 'assistant',
+        content: `❌ Lỗi: ${err.message}`,
+      }]);
+    } finally {
+      setChatLoading(false);
     }
   };
 
@@ -503,6 +540,95 @@ export default function AssignmentDetail() {
           )}
         </div>
       </main>
+
+      {/* ── AI Chat Widget (students only) ── */}
+      {user?.role === 'student' && assignment && (
+        <div className="fixed bottom-6 right-6 z-50">
+          {showChat ? (
+            <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 flex flex-col overflow-hidden"
+              style={{ width: '360px', height: '520px' }}>
+
+              {/* Chat header */}
+              <div className="px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 flex items-center justify-between shrink-0">
+                <div>
+                  <h3 className="text-white font-semibold text-sm">🤖 Trợ lý học tập AI</h3>
+                  <p className="text-blue-200 text-xs mt-0.5">Gợi ý & hướng dẫn — không cho đáp án thẳng</p>
+                </div>
+                <button onClick={() => setShowChat(false)}
+                  className="text-blue-200 hover:text-white text-2xl leading-none w-7 h-7 flex items-center justify-center rounded-full hover:bg-white/20 transition-colors">
+                  ×
+                </button>
+              </div>
+
+              {/* Messages area */}
+              <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3 bg-gray-50">
+                {chatHistory.length === 0 && (
+                  <div className="text-center py-8 px-4">
+                    <div className="text-4xl mb-3">🎓</div>
+                    <p className="text-gray-600 text-sm font-medium">Xin chào! Tôi là trợ lý học tập.</p>
+                    <p className="text-gray-400 text-xs mt-1">Hỏi tôi về bài toán bạn đang làm nhé.<br/>Tôi sẽ gợi ý hướng suy nghĩ, không cho đáp án thẳng.</p>
+                  </div>
+                )}
+                {chatHistory.map((msg, i) => (
+                  <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    {msg.role === 'assistant' && (
+                      <span className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-xs mr-2 shrink-0 mt-1">🤖</span>
+                    )}
+                    <div className={`max-w-[82%] px-3 py-2 rounded-2xl text-sm leading-relaxed ${
+                      msg.role === 'user'
+                        ? 'bg-blue-600 text-white rounded-br-sm'
+                        : 'bg-white text-gray-800 rounded-bl-sm shadow-sm border border-gray-100'
+                    }`}>
+                      {msg.content.split('\n').map((line, j) => (
+                        <span key={j}>{line}{j < msg.content.split('\n').length - 1 && <br />}</span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+                {chatLoading && (
+                  <div className="flex justify-start items-center gap-2">
+                    <span className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-xs shrink-0">🤖</span>
+                    <div className="bg-white border border-gray-100 shadow-sm px-4 py-2 rounded-2xl rounded-bl-sm flex gap-1">
+                      {[0, 1, 2].map(d => (
+                        <span key={d} className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"
+                          style={{ animationDelay: `${d * 0.15}s` }} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <div ref={chatBottomRef} />
+              </div>
+
+              {/* Input area */}
+              <div className="px-3 py-3 border-t border-gray-200 bg-white flex gap-2 shrink-0">
+                <input
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleChatSend(); } }}
+                  placeholder="Hỏi về bài toán..."
+                  disabled={chatLoading}
+                  className="flex-1 rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-300 disabled:bg-gray-50"
+                />
+                <button
+                  onClick={handleChatSend}
+                  disabled={chatLoading || !chatInput.trim()}
+                  className="w-9 h-9 flex items-center justify-center bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-40 transition-colors shrink-0 text-base"
+                >
+                  ➤
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowChat(true)}
+              className="flex items-center gap-2 pl-4 pr-5 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-full shadow-lg hover:shadow-xl hover:scale-105 transition-all font-medium text-sm"
+            >
+              <span className="text-lg">💬</span>
+              <span>Hỏi AI</span>
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
