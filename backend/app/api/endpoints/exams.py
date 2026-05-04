@@ -35,27 +35,28 @@ QUY TẮC:
 - Nếu không nhận diện được câu hỏi nào → trả về []"""
 
 
-VARIANT_SYSTEM_PROMPT = """Bạn là chuyên gia biên soạn đề thi. Nhiệm vụ của bạn là tạo ra một 'biến thể' (Variant) của bộ đề thi được cung cấp.
+VARIANT_SYSTEM_PROMPT = """Bạn là một chuyên gia khảo thí và biên soạn đề thi dày dặn kinh nghiệm. Nhiệm vụ của bạn là tạo ra một bộ đề thi 'Biến thể' (Variant) từ bộ đề gốc, đảm bảo tính tương đương về độ khó nhưng hoàn toàn mới về dữ liệu.
 
-YÊU CẦU:
-1. Giữ nguyên số lượng câu hỏi.
-2. Giữ nguyên loại câu hỏi (multiple_choice, true_false, essay) và độ khó cho từng câu tương ứng.
-3. Thay đổi dữ kiện chi tiết: 
-   - Toán/Lý/Hóa: Thay đổi con số, giá trị (phải đảm bảo tính toán ra kết quả hợp lý).
-   - Văn học/Tiếng Anh: Thay đổi ngữ cảnh, nhân vật hoặc đoạn văn tương tự.
-   - Trắc nghiệm: Thay đổi cả nội dung các phương án nhiễu nhưng giữ nguyên đáp án đúng là một lựa chọn hợp lý.
-4. Trả về mảng JSON đúng định dạng đã cho.
+YÊU CẦU CHI TRUYÊN SÂU:
+1. PHÂN TÍCH LOGIC: Trước khi tạo câu hỏi mới, hãy phân tích xem câu hỏi gốc đang kiểm tra kiến thức/kỹ năng gì (Ví dụ: tính chất tam giác, đạo hàm, đọc hiểu ngụ ý...). Câu hỏi mới PHẢI kiểm tra đúng kỹ năng đó.
+2. BIẾN ĐỔI DỮ KIỆN (DATA SHIFT):
+   - Toán/Khoa học: Thay đổi các con số. Quan trọng: Hãy giải nhẩm trước để đảm bảo con số mới dẫn đến kết quả 'đẹp' hoặc hợp lý (tránh kết quả quá lẻ trừ khi đề yêu cầu).
+   - Ngôn ngữ/Xã hội: Thay đổi bối cảnh, tên nhân vật, địa danh hoặc ngữ liệu văn học tương đương về phong cách và độ khó.
+3. XÂY DỰNG PHƯƠNG ÁN NHIỄU (SMART DISTRACTORS):
+   - Không lấy số ngẫu nhiên cho các phương án sai.
+   - Các phương án sai PHẢI là kết quả của các lỗi tư duy phổ biến (Ví dụ: tính sai dấu, quên chia 2, nhầm công thức). Điều này giúp phân loại học sinh tốt hơn.
+4. GIỮ NGUYÊN CẤU TRÚC: Giữ nguyên loại câu hỏi (MCQ, True/False, Essay) và thứ tự.
 
 ĐỊNH DẠNG JSON MỖI CÂU HỎI:
 {
-  "title": "Tiêu đề câu",
-  "description": "Nội dung câu hỏi mới đã được biến đổi",
-  "problem_type": "loại câu",
+  "title": "Câu X (hoặc tiêu đề ngắn gọn)",
+  "description": "Nội dung câu hỏi mới (sử dụng LaTeX $...$ cho công thức)",
+  "problem_type": "giữ nguyên loại gốc",
   "choices": {"A": "...", "B": "...", "C": "...", "D": "..."},
-  "correct_answer": "đáp án đúng",
-  "difficulty": "độ khó",
-  "category": "chủ đề",
-  "solution": "Lời giải chi tiết cho câu hỏi mới này"
+  "correct_answer": "đáp án đúng mới",
+  "difficulty": "giữ nguyên độ khó",
+  "category": "giữ nguyên chủ đề",
+  "solution": "Lời giải chi tiết từng bước (giúp học sinh hiểu tại sao đáp án đó đúng)"
 }
 
 QUY TẮC: Trả về DUY NHẤT một mảng JSON hợp lệ, KHÔNG có text nào khác."""
