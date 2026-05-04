@@ -261,48 +261,80 @@ def analyze_exam_file(
             except Exception as e:
                 print(f"[ANALYZE] PyMuPDF lỗi: {e}", flush=True)
 
-        # Bước 3: nếu vẫn ít text → PDF là image-based → OCR bằng Tesseract
+        # Bước 3: PDF image-based → Gemini Vision (đọc cả hình vẽ, công thức)
         if len(words) < 20:
-            print(f"[ANALYZE] PyMuPDF cũng kém ({len(words)} từ) → thử OCR (Tesseract)...", flush=True)
+            print(f"[ANALYZE] PDF image-based ({len(words)} từ) → Gemini Vision...", flush=True)
+            gemini_key = os.environ.get("GEMINI_API_KEY", "").strip()
+            if not gemini_key:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "PDF này là file ảnh (không có text layer). "
+                        "Cần cấu hình GEMINI_API_KEY trên Railway để đọc loại PDF này."
+                    ),
+                )
             try:
                 import fitz
-                import pytesseract
-                from PIL import Image as _PIL_Image
+                import base64 as _b64
 
                 doc = fitz.open(stream=raw, filetype="pdf")
-                ocr_pages = []
+                parts = []
                 for page in doc:
-                    # Render ở 2x resolution cho OCR chính xác hơn
                     mat = fitz.Matrix(2.0, 2.0)
                     pix = page.get_pixmap(matrix=mat, colorspace=fitz.csRGB)
                     img_bytes = pix.tobytes("png")
-                    img = _PIL_Image.open(_io.BytesIO(img_bytes))
-                    ocr_text = pytesseract.image_to_string(img, lang="vie+eng", config="--psm 3")
-                    if ocr_text.strip():
-                        ocr_pages.append(ocr_text)
+                    b64 = _b64.b64encode(img_bytes).decode()
+                    parts.append({"inline_data": {"mime_type": "image/png", "data": b64}})
                 doc.close()
+                parts.append({
+                    "text": (
+                        "Đây là đề thi. Trích xuất TẤT CẢ câu hỏi và trả về mảng JSON theo định dạng đã yêu cầu. "
+                        "Với câu hỏi có hình vẽ/biểu đồ/đồ thị, hãy mô tả chi tiết hình vẽ đó trong phần description "
+                        "để học sinh có thể hiểu câu hỏi mà không cần nhìn hình gốc."
+                    )
+                })
 
-                ocr_full = "\n\n".join(ocr_pages).strip()
-                ocr_words = _re.findall(r'[a-zA-ZÀ-ỹ\d]{2,}', ocr_full)
-                print(f"[ANALYZE] OCR: {len(ocr_words)} từ, {len(ocr_full)} ký tự", flush=True)
-                if len(ocr_words) > len(words):
-                    extracted_text = ocr_full
-                    words = ocr_words
-            except ImportError as ie:
-                print(f"[ANALYZE] Tesseract/pytesseract chưa cài: {ie}", flush=True)
+                g_resp = httpx.post(
+                    f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={gemini_key}",
+                    json={
+                        "system_instruction": {"parts": [{"text": ANALYZE_SYSTEM_PROMPT}]},
+                        "contents": [{"parts": parts}],
+                        "generationConfig": {"maxOutputTokens": 8000, "temperature": 0.1},
+                    },
+                    timeout=180.0,
+                )
+                if not g_resp.is_success:
+                    body = g_resp.text[:500]
+                    print(f"[ANALYZE] ❌ Gemini {g_resp.status_code}: {body}", flush=True)
+                    raise HTTPException(status_code=500, detail=f"Gemini API lỗi {g_resp.status_code}: {body}")
+
+                raw_text = g_resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+                print(f"[ANALYZE] ✅ GEMINI VISION — {len(raw_text)} ký tự", flush=True)
+                questions = _parse_json_from_llm(raw_text)
+
+                normalised = []
+                for i, q in enumerate(questions):
+                    normalised.append({
+                        "title": q.get("title") or f"Câu {i + 1}",
+                        "description": q.get("description", ""),
+                        "problem_type": q.get("problem_type", "essay"),
+                        "choices": q.get("choices"),
+                        "correct_answer": q.get("correct_answer"),
+                        "difficulty": q.get("difficulty", "medium"),
+                        "category": q.get("category", "Tổng hợp"),
+                        "solution": q.get("solution"),
+                    })
+                return {"questions": normalised, "count": len(normalised)}
+
+            except HTTPException:
+                raise
             except Exception as e:
-                print(f"[ANALYZE] OCR lỗi: {e}", flush=True)
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Gemini Vision lỗi: {type(e).__name__}: {str(e)}",
+                )
 
-        if len(extracted_text) < 100 or len(words) < 20:
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    f"Không đọc được text từ PDF này (đọc được {len(words)} từ). "
-                    f"Vui lòng đảm bảo PDF có text layer (xuất từ Word/Google Docs), "
-                    f"hoặc nếu là file scan thì cần đảm bảo Tesseract OCR đã được cài trên server."
-                ),
-            )
-
+        # ── PDF có text → DeepSeek ────────────────────────────────────────
         print(f"[ANALYZE] ✅ TEXT MODE — {len(words)} từ, {len(extracted_text)} ký tự", flush=True)
 
         # Giới hạn độ dài để tránh vượt token limit (~30k ký tự ≈ 10k tokens)
