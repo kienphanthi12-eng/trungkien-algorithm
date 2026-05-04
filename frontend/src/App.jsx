@@ -120,6 +120,22 @@ function App() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/classrooms"
+            element={
+              <ProtectedRoute>
+                <ClassroomList />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/classrooms/:classroomId"
+            element={
+              <ProtectedRoute>
+                <ClassroomDetail />
+              </ProtectedRoute>
+            }
+          />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AuthProvider>
