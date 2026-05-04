@@ -4,6 +4,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { getExam, getStudents, createAssignment, generateExamVariant } from '../services/api';
 import MarkdownRenderer from '../components/MarkdownRenderer';
 import PrintableExam from '../components/PrintableExam';
+import FigureRenderer from '../components/FigureRenderer';
 import { useReactToPrint } from 'react-to-print';
 import React, { useRef } from 'react';
 import logo from '../assets/logo.png';
@@ -303,6 +304,7 @@ export default function ExamDetail() {
                         <div>
                           <p className="text-xs font-bold text-slate-500 mb-1">Nội dung câu hỏi</p>
                           <MarkdownRenderer content={p.description} className="text-sm" />
+                          {p.figure_json && <FigureRenderer data={p.figure_json} />}
                         </div>
 
                         {/* MCQ choices */}

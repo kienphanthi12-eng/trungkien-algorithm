@@ -1,5 +1,6 @@
 import React from 'react';
 import MarkdownRenderer from './MarkdownRenderer';
+import FigureRenderer from './FigureRenderer';
 
 const PrintableExam = React.forwardRef(({ exam }, ref) => {
   if (!exam) return null;
@@ -46,6 +47,7 @@ const PrintableExam = React.forwardRef(({ exam }, ref) => {
                 <span className="font-bold shrink-0">Câu {idx + 1}:</span>
                 <div className="prose prose-slate max-w-none print-math">
                   <MarkdownRenderer content={p.description || p.problem_text || ""} />
+                  {p.figure_json && <FigureRenderer data={p.figure_json} />}
                   {!p.description && !p.problem_text && <span className="text-red-500">[Dữ liệu câu hỏi trống]</span>}
                 </div>
               </div>

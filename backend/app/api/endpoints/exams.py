@@ -28,11 +28,14 @@ Với mỗi câu hỏi, trả về:
 QUY TẮC ĐỊNH DẠNG (BẮT BUỘC):
 - Công thức toán học: Sử dụng $...$ cho inline và $$...$$ cho block.
 - Bảng số liệu: Sử dụng định dạng Markdown Table chuẩn. 
-  QUAN TRỌNG: Mỗi hàng của bảng PHẢI nằm trên một dòng riêng biệt. Không được viết dính liền.
-  Ví dụ đúng:
-  | Header 1 | Header 2 |
-  |----------|----------|
-  | Row 1    | Data 1   |
+- HÌNH VẼ (figure_json): Nếu đề thi có hình vẽ minh họa, hãy trích xuất cấu trúc hình học cơ bản:
+  {
+    "viewBox": "0 0 400 300",
+    "elements": [
+      {"type": "point", "x": 100, "y": 100, "label": "A"},
+      {"type": "line", "start": [100, 100], "end": [200, 100], "dashed": false}
+    ]
+  }
 - Bảng biến thiên/Bảng phức tạp: Sử dụng môi trường LaTeX \\begin{array} ... \\end{array}.
 - LUÔN để một dòng trống trước và sau các khối bảng/toán học.
 - Trả về DUY NHẤT một mảng JSON hợp lệ. KHÔNG có text nào khác ngoài JSON.
@@ -57,6 +60,7 @@ BƯỚC 4 — KIỂM TRA BẮT BUỘC trước khi output:
 □ Đúng/Sai: Mỗi mệnh đề phải có giá trị Đúng/Sai rõ ràng, không mơ hồ.
 □ Nhất quán: Các dữ kiện trong câu không mâu thuẫn (điểm trên đồ thị, tọa độ, bảng số liệu).
 □ TXĐ đúng: Hàm số/phương trình phải có miền xác định phù hợp với dữ kiện đã cho.
+□ HÌNH VẼ: Nếu đề gốc có figure_json, hãy cập nhật tọa độ các điểm trong figure_json để khớp với dữ kiện mới trong câu hỏi.
 
 ĐỊNH DẠNG OUTPUT — chỉ trả về mảng JSON, không kèm text nào khác:
 [
@@ -68,7 +72,8 @@ BƯỚC 4 — KIỂM TRA BẮT BUỘC trước khi output:
     "correct_answer": "A/B/C/D hoặc null",
     "difficulty": "easy | medium | hard",
     "category": "giữ nguyên category gốc",
-    "solution": "Lời giải từng bước đầy đủ, dùng LaTeX cho công thức. Phải chứng minh tại sao correct_answer đúng VÀ tại sao các đáp án còn lại sai."
+    "solution": "Lời giải từng bước đầy đủ, dùng LaTeX cho công thức. Phải chứng minh tại sao correct_answer đúng VÀ tại sao các đáp án còn lại sai.",
+    "figure_json": { "viewBox": "0 0 400 300", "elements": [...] }
   }
 ]"""
 
@@ -84,6 +89,8 @@ class ExtractedQuestion(BaseModel):
     difficulty: str = "medium"
     category: str = "Tổng hợp"
     solution: Optional[str] = None
+    figure_json: Optional[Dict] = None
+
 
 class ExamFromQuestions(BaseModel):
     title: str
