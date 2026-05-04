@@ -18,12 +18,15 @@ def get_classrooms(
     try:
         if current_user.role == 'teacher':
             # Get teacher's classrooms - Simplified query
+            print(f"[Debug] Fetching classrooms for teacher_id: {current_user.id}")
             resp = supabase_client.table("classrooms")\
                 .select("*")\
                 .eq("teacher_id", str(current_user.id))\
                 .range(skip, skip + limit - 1)\
                 .order("created_at", desc=True)\
                 .execute()
+            
+            print(f"[Debug] Supabase response data: {resp.data}")
             
             # Count total
             count_resp = supabase_client.table("classrooms").select("*", count="exact").eq("teacher_id", str(current_user.id)).execute()
