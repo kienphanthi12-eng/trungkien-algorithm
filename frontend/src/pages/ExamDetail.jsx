@@ -47,9 +47,17 @@ export default function ExamDetail() {
   // Printing logic
   const componentRef = useRef();
   const handlePrint = useReactToPrint({
-    content: () => componentRef.current,
+    contentRef: componentRef,
     documentTitle: exam ? `De_thi_${exam.title}` : 'De_thi',
+    onAfterPrint: () => console.log("[Print] In thành công"),
+    onPrintError: (error) => console.error("[Print] Lỗi khi in:", error),
   });
+
+  // Manual wrapper to log click
+  const onPrintClick = () => {
+    console.log("[Print] Nút in đã được nhấn");
+    handlePrint();
+  };
 
   useEffect(() => {
     loadExam();
@@ -190,7 +198,7 @@ export default function ExamDetail() {
                     ✨ Tạo biến thể AI
                   </button>
                   <button
-                    onClick={handlePrint}
+                    onClick={onPrintClick}
                     className="px-4 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-sm font-bold rounded-xl shadow-lg shadow-blue-200 hover:scale-105 transition-all flex items-center gap-2"
                   >
                     🖨️ In đề / PDF
