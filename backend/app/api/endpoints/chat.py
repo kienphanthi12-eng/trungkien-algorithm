@@ -8,6 +8,10 @@ from app.api.dependencies import get_current_user
 
 router = APIRouter()
 
+# ─── Config ────────────────────────────────────────────────────────────────────
+
+DAILY_LIMIT = 20   # số lượt chat AI tối đa mỗi ngày / học sinh
+
 # ─── System Prompt ─────────────────────────────────────────────────────────────
 
 TUTOR_BASE_PROMPT = """Bạn là trợ lý học tập thông minh hỗ trợ học sinh Việt Nam làm bài tập.
@@ -41,7 +45,58 @@ class ChatRequest(BaseModel):
     history: List[ChatMessage] = []
 
 
-# ─── Helpers ───────────────────────────────────────────────────────────────────
+# ─── Quota helpers ─────────────────────────────────────────────────────────────
+
+def _get_usage_today(student_id: str) -> int:
+    """Trả về số lượt đã dùng hôm nay của học sinh."""
+    try:
+        from datetime import date
+        today = date.today().isoformat()
+        resp = (
+            supabase_client.table("llm_usage")
+            .select("count")
+            .eq("student_id", student_id)
+            .eq("date", today)
+            .execute()
+        )
+        if resp.data:
+            return resp.data[0]["count"]
+        return 0
+    except Exception:
+        return 0  # Nếu bảng chưa tồn tại, cho phép dùng
+
+
+def _increment_usage(student_id: str) -> int:
+    """Tăng count lên 1, trả về count mới. Dùng upsert để an toàn khi concurrent."""
+    try:
+        from datetime import date
+        today = date.today().isoformat()
+        # Thử upsert: nếu đã có record thì tăng count, nếu chưa thì tạo mới
+        existing = (
+            supabase_client.table("llm_usage")
+            .select("id, count")
+            .eq("student_id", student_id)
+            .eq("date", today)
+            .execute()
+        )
+        if existing.data:
+            new_count = existing.data[0]["count"] + 1
+            supabase_client.table("llm_usage").update({"count": new_count}).eq(
+                "id", existing.data[0]["id"]
+            ).execute()
+            return new_count
+        else:
+            supabase_client.table("llm_usage").insert({
+                "student_id": student_id,
+                "date": today,
+                "count": 1,
+            }).execute()
+            return 1
+    except Exception:
+        return 1  # Nếu bảng chưa tồn tại, không block user
+
+
+# ─── Problem context helper ────────────────────────────────────────────────────
 
 def _get_problem_context(assignment_id: str) -> str:
     """Fetch the problem info attached to an assignment."""
@@ -125,7 +180,26 @@ def _call_llm_chat_sync(system_prompt: str, messages: list) -> str:
     raise ValueError("Chưa cấu hình DEEPSEEK_API_KEY hoặc ANTHROPIC_API_KEY.")
 
 
-# ─── Endpoint ──────────────────────────────────────────────────────────────────
+# ─── Endpoints ─────────────────────────────────────────────────────────────────
+
+@router.get("/quota")
+def get_quota(current_user=Depends(get_current_user)):
+    """
+    Trả về số lượt chat AI còn lại hôm nay cho học sinh.
+    Giáo viên không bị giới hạn.
+    """
+    if current_user.user_metadata.get("role") == "teacher":
+        return {"used": 0, "limit": None, "remaining": None, "is_teacher": True}
+
+    used = _get_usage_today(str(current_user.id))
+    remaining = max(0, DAILY_LIMIT - used)
+    return {
+        "used": used,
+        "limit": DAILY_LIMIT,
+        "remaining": remaining,
+        "is_teacher": False,
+    }
+
 
 @router.post("/message")
 async def chat_message(
@@ -136,9 +210,22 @@ async def chat_message(
     Student chats with AI tutor about their assignment.
     AI gives hints/guidance but never the direct answer.
     History is sent by client (stateless server).
+    Enforces daily quota for students.
     """
     if not body.message.strip():
         raise HTTPException(status_code=400, detail="Vui lòng nhập câu hỏi.")
+
+    student_id = str(current_user.id)
+    is_teacher = current_user.user_metadata.get("role") == "teacher"
+
+    # ── Quota check (students only) ────────────────────────────────────────
+    if not is_teacher:
+        used = _get_usage_today(student_id)
+        if used >= DAILY_LIMIT:
+            raise HTTPException(
+                status_code=429,
+                detail=f"Bạn đã dùng hết {DAILY_LIMIT} lượt hỏi AI hôm nay. Quay lại vào ngày mai nhé! 📅",
+            )
 
     # Build system prompt enriched with problem context
     context = _get_problem_context(body.assignment_id)
@@ -151,7 +238,17 @@ async def chat_message(
 
     try:
         reply = await asyncio.to_thread(_call_llm_chat_sync, system_prompt, messages)
-        return {"reply": reply}
+
+        # ── Increment usage after successful reply ─────────────────────────
+        if not is_teacher:
+            new_count = _increment_usage(student_id)
+            remaining = max(0, DAILY_LIMIT - new_count)
+            return {"reply": reply, "quota": {"used": new_count, "remaining": remaining, "limit": DAILY_LIMIT}}
+
+        return {"reply": reply, "quota": None}
+
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=500,

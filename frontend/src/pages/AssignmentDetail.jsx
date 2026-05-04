@@ -10,6 +10,7 @@ import {
   gradeSubmission,
   getProblem,
   sendChatMessage,
+  getChatQuota,
 } from '../services/api';
 import { useNavigate } from 'react-router-dom';
 
@@ -58,6 +59,7 @@ export default function AssignmentDetail() {
   const [chatHistory, setChatHistory] = useState([]);
   const [chatInput, setChatInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
+  const [chatQuota, setChatQuota] = useState({ used: 0, limit: 20, remaining: 20 });
   const chatBottomRef = useRef(null);
 
   useEffect(() => {
@@ -146,6 +148,7 @@ export default function AssignmentDetail() {
   const handleChatSend = async () => {
     const msg = chatInput.trim();
     if (!msg || chatLoading) return;
+    if (chatQuota.remaining <= 0) return;
     setChatInput('');
     const userMsg = { role: 'user', content: msg };
     setChatHistory(prev => [...prev, userMsg]);
@@ -157,14 +160,28 @@ export default function AssignmentDetail() {
         history: chatHistory,
       });
       setChatHistory(prev => [...prev, { role: 'assistant', content: res.reply }]);
+      // Cập nhật quota từ response
+      if (res.quota) setChatQuota(res.quota);
     } catch (err) {
       setChatHistory(prev => [...prev, {
         role: 'assistant',
-        content: `❌ Lỗi: ${err.message}`,
+        content: `❌ ${err.message}`,
       }]);
+      // Nếu hết quota (429), fetch lại quota để đồng bộ UI
+      if (err.message.includes('hết') || err.message.includes('lượt')) {
+        getChatQuota(token).then(q => setChatQuota(q)).catch(() => {});
+      }
     } finally {
       setChatLoading(false);
     }
+  };
+
+  const handleOpenChat = async () => {
+    setShowChat(true);
+    try {
+      const q = await getChatQuota(token);
+      setChatQuota(q);
+    } catch {}
   };
 
   const formatDate = (dateStr) => {
@@ -555,7 +572,11 @@ export default function AssignmentDetail() {
               <div className="px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 flex items-center justify-between shrink-0">
                 <div>
                   <h3 className="text-white font-semibold text-sm">🤖 Trợ lý học tập AI</h3>
-                  <p className="text-blue-200 text-xs mt-0.5">Gợi ý & hướng dẫn — không cho đáp án thẳng</p>
+                  <p className="text-blue-200 text-xs mt-0.5">
+                    {chatQuota.limit
+                      ? `Còn ${chatQuota.remaining}/${chatQuota.limit} lượt hôm nay`
+                      : 'Gợi ý & hướng dẫn — không cho đáp án thẳng'}
+                  </p>
                 </div>
                 <button onClick={() => setShowChat(false)}
                   className="text-blue-200 hover:text-white text-2xl leading-none w-7 h-7 flex items-center justify-center rounded-full hover:bg-white/20 transition-colors">
@@ -603,31 +624,43 @@ export default function AssignmentDetail() {
               </div>
 
               {/* Input area */}
-              <div className="px-3 py-3 border-t border-gray-200 bg-white flex gap-2 shrink-0">
-                <input
-                  value={chatInput}
-                  onChange={(e) => setChatInput(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleChatSend(); } }}
-                  placeholder="Hỏi về bài toán..."
-                  disabled={chatLoading}
-                  className="flex-1 rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-300 disabled:bg-gray-50"
-                />
-                <button
-                  onClick={handleChatSend}
-                  disabled={chatLoading || !chatInput.trim()}
-                  className="w-9 h-9 flex items-center justify-center bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-40 transition-colors shrink-0 text-base"
-                >
-                  ➤
-                </button>
-              </div>
+              {chatQuota.remaining === 0 ? (
+                <div className="px-4 py-4 border-t border-gray-200 bg-orange-50 text-center shrink-0">
+                  <p className="text-orange-700 text-xs font-bold">📅 Bạn đã dùng hết {chatQuota.limit} lượt hôm nay.</p>
+                  <p className="text-orange-500 text-xs mt-0.5">Quay lại vào ngày mai nhé!</p>
+                </div>
+              ) : (
+                <div className="px-3 py-3 border-t border-gray-200 bg-white flex gap-2 shrink-0">
+                  <input
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleChatSend(); } }}
+                    placeholder="Hỏi về bài toán..."
+                    disabled={chatLoading}
+                    className="flex-1 rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-300 disabled:bg-gray-50"
+                  />
+                  <button
+                    onClick={handleChatSend}
+                    disabled={chatLoading || !chatInput.trim()}
+                    className="w-9 h-9 flex items-center justify-center bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-40 transition-colors shrink-0 text-base"
+                  >
+                    ➤
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
             <button
-              onClick={() => setShowChat(true)}
+              onClick={handleOpenChat}
               className="flex items-center gap-2 pl-4 pr-5 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-full shadow-lg hover:shadow-xl hover:scale-105 transition-all font-medium text-sm"
             >
               <span className="text-lg">💬</span>
               <span>Hỏi AI</span>
+              {chatQuota.limit && chatQuota.remaining < chatQuota.limit && (
+                <span className="bg-white/20 text-xs px-2 py-0.5 rounded-full font-bold">
+                  {chatQuota.remaining} lượt
+                </span>
+              )}
             </button>
           )}
         </div>

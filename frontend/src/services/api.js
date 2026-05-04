@@ -284,13 +284,29 @@ export async function getSubmission(token, submissionId) {
 }
 
 // Chat API
-export async function sendChatMessage(token, { assignment_id, message, history }) {
-  const response = await _authFetch(`${API_BASE_URL}/chat/message`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ assignment_id, message, history }),
-  }, token);
-  if (!response.ok) { const e = await response.json(); throw new Error(e.detail || 'Lỗi khi gọi AI'); }
+export async function getChatQuota(token) {
+  const response = await fetch(`${API_BASE_URL}/chat/quota`, {
+    method: 'GET',
+    headers: { 'Authorization': `Bearer ${token}` },
+  });
+  if (!response.ok) return { used: 0, limit: 20, remaining: 20 };
   return response.json();
+}
+
+export async function sendChatMessage(token, { assignment_id, message, history }) {
+  const response = await fetch(`${API_BASE_URL}/chat/message`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify({ assignment_id, message, history }),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Lỗi khi gọi AI');
+  }
+  return response.json(); // { reply: "...", quota: { used, remaining, limit } }
 }
 
 export async function gradeSubmission(token, submissionId) {
