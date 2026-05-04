@@ -524,35 +524,62 @@ def generate_exam_variant(
                 "category": p.get("category"),
             })
 
-    # 3. Call AI
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+    # 3. Call AI (DeepSeek preferred)
+    ds_key = os.environ.get("DEEPSEEK_API_KEY", "").strip()
+    api_key = ds_key or os.environ.get("ANTHROPIC_API_KEY", "").strip()
+    
     if not api_key:
-        raise HTTPException(status_code=500, detail="ANTHROPIC_API_KEY chưa cấu hình.")
+        raise HTTPException(status_code=500, detail="Chưa cấu hình DEEPSEEK_API_KEY hoặc ANTHROPIC_API_KEY.")
 
     try:
         import urllib.request as _urllib_req
-        payload_bytes = json.dumps({
-            "model": "claude-3-5-sonnet-latest",
-            "max_tokens": 8000,
-            "system": VARIANT_SYSTEM_PROMPT,
-            "messages": [{"role": "user", "content": f"Hãy tạo biến thể cho bộ đề sau đây:\n\n{json.dumps(source_questions, ensure_ascii=False)}"}],
-        }).encode("utf-8")
-
-        _req = _urllib_req.Request(
-            "https://api.anthropic.com/v1/messages",
-            data=payload_bytes,
-            headers={
+        
+        if ds_key:
+            # --- DeepSeek Logic ---
+            print("[VARIANT] Using DeepSeek V3...", flush=True)
+            url = "https://api.deepseek.com/chat/completions"
+            payload = {
+                "model": "deepseek-chat",
+                "messages": [
+                    {"role": "system", "content": VARIANT_SYSTEM_PROMPT},
+                    {"role": "user", "content": f"Hãy tạo biến thể cho bộ đề sau đây:\n\n{json.dumps(source_questions, ensure_ascii=False)}"}
+                ],
+                "temperature": 0.7,
+                "response_format": {"type": "json_object"} if "deepseek" in url else None
+            }
+            headers = {
+                "Authorization": f"Bearer {ds_key}",
+                "Content-Type": "application/json"
+            }
+        else:
+            # --- Anthropic Fallback ---
+            print("[VARIANT] Falling back to Anthropic...", flush=True)
+            url = "https://api.anthropic.com/v1/messages"
+            payload = {
+                "model": "claude-3-5-sonnet-latest",
+                "max_tokens": 8000,
+                "system": VARIANT_SYSTEM_PROMPT,
+                "messages": [{"role": "user", "content": f"Hãy tạo biến thể cho bộ đề sau đây:\n\n{json.dumps(source_questions, ensure_ascii=False)}"}],
+            }
+            headers = {
                 "x-api-key": api_key,
                 "anthropic-version": "2023-06-01",
                 "content-type": "application/json",
-            },
-            method="POST",
-        )
+            }
+
+        payload_bytes = json.dumps(payload).encode("utf-8")
+        _req = _urllib_req.Request(url, data=payload_bytes, headers=headers, method="POST")
+        
         with _urllib_req.urlopen(_req, timeout=300) as _resp:
             _result = json.loads(_resp.read().decode("utf-8"))
 
-        raw_text = _result["content"][0]["text"]
+        if ds_key:
+            raw_text = _result["choices"][0]["message"]["content"]
+        else:
+            raw_text = _result["content"][0]["text"]
+            
         new_questions_data = _parse_json_from_llm(raw_text)
+
 
         # 4. Create the new variant exam
         new_exam_data = ExamFromQuestions(
