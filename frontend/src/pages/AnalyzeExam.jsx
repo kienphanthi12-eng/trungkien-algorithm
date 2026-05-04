@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
 import { analyzeExam, createExamFromQuestions } from '../services/api';
+import MarkdownRenderer from '../components/MarkdownRenderer';
 import logo from '../assets/logo.png';
 
 const DIFFICULTY_OPTIONS = ['easy', 'medium', 'hard'];
@@ -349,7 +350,9 @@ export default function AnalyzeExam() {
                         </span>
                         <div className="flex-1 min-w-0">
                           <p className="font-bold text-slate-800 text-sm truncate">{q.title || `Câu ${idx + 1}`}</p>
-                          <p className="text-slate-400 text-xs truncate">{q.description || '(chưa có nội dung)'}</p>
+                          <div className="text-slate-400 text-xs truncate max-h-5 overflow-hidden">
+                            <MarkdownRenderer content={q.description || '(chưa có nội dung)'} />
+                          </div>
                         </div>
                         <div className="flex items-center gap-2 flex-shrink-0">
                           <span className={`text-xs font-bold px-2 py-0.5 rounded-full
@@ -426,6 +429,12 @@ export default function AnalyzeExam() {
                               onChange={e => updateQuestion(idx, 'description', e.target.value)}
                               className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white resize-none"
                             />
+                            {q.description && (
+                              <div className="mt-2 p-3 bg-white border border-slate-100 rounded-lg shadow-inner overflow-x-auto">
+                                <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Xem trước (Preview):</p>
+                                <MarkdownRenderer content={q.description} />
+                              </div>
+                            )}
                           </div>
 
                           {/* MCQ choices */}

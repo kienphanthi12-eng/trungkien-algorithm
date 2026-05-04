@@ -13,6 +13,7 @@ import {
   getChatQuota,
 } from '../services/api';
 import { useNavigate } from 'react-router-dom';
+import MarkdownRenderer from '../components/MarkdownRenderer';
 
 const STATUS_LABEL = {
   pending: { text: 'Chờ nộp', cls: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
@@ -327,6 +328,14 @@ export default function AssignmentDetail() {
             </div>
           </div>
 
+          {/* Problem Content (Description) */}
+          {problem?.description && (
+            <div className="bg-white shadow rounded-lg overflow-hidden mb-6 p-6">
+              <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Nội dung đề bài</h2>
+              <MarkdownRenderer content={problem.description} />
+            </div>
+          )}
+
           {/* ── STUDENT: Submit form ── */}
           {user?.role === 'student' && assignment.status === 'pending' && !submission && (
             <div className="bg-white shadow rounded-lg overflow-hidden mb-6">
@@ -598,14 +607,12 @@ export default function AssignmentDetail() {
                     {msg.role === 'assistant' && (
                       <span className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-xs mr-2 shrink-0 mt-1">🤖</span>
                     )}
-                    <div className={`max-w-[82%] px-3 py-2 rounded-2xl text-sm leading-relaxed ${
+                    <div className={`max-w-[82%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
                       msg.role === 'user'
-                        ? 'bg-blue-600 text-white rounded-br-sm'
+                        ? 'bg-blue-600 text-white rounded-br-sm shadow-md'
                         : 'bg-white text-gray-800 rounded-bl-sm shadow-sm border border-gray-100'
                     }`}>
-                      {msg.content.split('\n').map((line, j) => (
-                        <span key={j}>{line}{j < msg.content.split('\n').length - 1 && <br />}</span>
-                      ))}
+                      <MarkdownRenderer content={msg.content} className={msg.role === 'user' ? 'text-white' : 'text-gray-800'} />
                     </div>
                   </div>
                 ))}

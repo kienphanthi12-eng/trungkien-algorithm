@@ -3,59 +3,9 @@ import { useAuth } from '../contexts/AuthContext';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import logo from '../assets/logo.png';
 import { getProblem, getStudents, createAssignment } from '../services/api';
+import MarkdownRenderer from '../components/MarkdownRenderer';
 
-// Simple description renderer — converts markdown-ish text to formatted JSX
-function DescriptionRenderer({ text }) {
-  if (!text) return null;
-  const lines = text.split('\n');
-  const result = [];
 
-  lines.forEach((line, i) => {
-    const trimmed = line.trim();
-
-    if (trimmed === '') {
-      result.push(<div key={i} className="h-3" />);
-    } else if (/^\s{2,}[+\-*]\s/.test(line)) {
-      // Indented sub-bullet (e.g. "  + ..." or "   - ...")
-      const content = line.replace(/^\s+[+\-*]\s/, '');
-      result.push(
-        <div key={i} className="flex gap-2 ml-8 text-gray-700">
-          <span className="text-gray-400 select-none mt-0.5">◦</span>
-          <span>{content}</span>
-        </div>
-      );
-    } else if (/^[+\-*]\s/.test(trimmed)) {
-      // Top-level bullet
-      const content = trimmed.replace(/^[+\-*]\s/, '');
-      result.push(
-        <div key={i} className="flex gap-2 ml-4 text-gray-700">
-          <span className="text-blue-400 select-none mt-0.5">•</span>
-          <span>{content}</span>
-        </div>
-      );
-    } else if (/^\d+\.\s/.test(trimmed)) {
-      // Numbered list
-      result.push(
-        <div key={i} className="flex gap-2 ml-4 text-gray-700">
-          <span className="text-blue-500 font-medium select-none min-w-[20px]">{trimmed.match(/^\d+/)[0]}.</span>
-          <span>{trimmed.replace(/^\d+\.\s/, '')}</span>
-        </div>
-      );
-    } else if (/^#{1,3}\s/.test(trimmed)) {
-      // Heading
-      const content = trimmed.replace(/^#{1,3}\s/, '');
-      result.push(
-        <p key={i} className="font-semibold text-gray-900 mt-2">{content}</p>
-      );
-    } else {
-      result.push(
-        <p key={i} className="text-gray-700 leading-relaxed">{line}</p>
-      );
-    }
-  });
-
-  return <div className="space-y-1">{result}</div>;
-}
 
 export default function ProblemDetail() {
   const { user, token, logoutUser } = useAuth();
@@ -241,7 +191,7 @@ export default function ProblemDetail() {
             {/* Description */}
             <div className="mb-6 pb-6 border-b border-gray-200">
               <h2 className="text-lg font-semibold text-gray-900 mb-3">Đề bài</h2>
-              <DescriptionRenderer text={problem.description} />
+              <MarkdownRenderer content={problem.description} />
             </div>
 
             {/* MCQ choices */}
@@ -280,7 +230,7 @@ export default function ProblemDetail() {
                   💡 Lời giải <span className="text-xs font-normal text-gray-400">(chỉ giáo viên thấy)</span>
                 </h2>
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                  <DescriptionRenderer text={problem.solution} />
+                  <MarkdownRenderer content={problem.solution} className="prose-yellow" />
                 </div>
               </div>
             )}
