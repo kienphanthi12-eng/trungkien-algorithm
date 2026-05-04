@@ -317,7 +317,11 @@ def analyze_exam_file(
                     json={
                         "system_instruction": {"parts": [{"text": ANALYZE_SYSTEM_PROMPT}]},
                         "contents": [{"parts": parts}],
-                        "generationConfig": {"maxOutputTokens": 8000, "temperature": 0.1},
+                        "generationConfig": {
+                            "maxOutputTokens": 8000, 
+                            "temperature": 0.1,
+                            "response_mime_type": "application/json"
+                        },
                     },
                     timeout=180.0,
                 )
