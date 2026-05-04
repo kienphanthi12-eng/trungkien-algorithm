@@ -120,6 +120,24 @@ def health_check():
     return {"status": "ok", "module": "exams"}
 
 
+@router.get("/pypdf-check")
+def pypdf_check():
+    """Kiểm tra pypdf có được cài trên server không."""
+    try:
+        import pypdf as _pypdf
+        return {
+            "pypdf_installed": True,
+            "version": getattr(_pypdf, "__version__", "unknown"),
+            "message": "✅ pypdf đã được cài đặt. PDF digital sẽ được đọc bằng pypdf."
+        }
+    except ImportError:
+        return {
+            "pypdf_installed": False,
+            "version": None,
+            "message": "❌ pypdf CHƯA được cài. Server đang dùng Claude Vision cho PDF."
+        }
+
+
 # NOTE: /analyze and /create-from-questions must be defined BEFORE /{exam_id}
 # to prevent FastAPI routing them as UUID path params.
 
