@@ -1,5 +1,5 @@
 @echo off
 git add .
-git commit -m "FIX_FINAL: Add lucide-react and resolve ExamDetail crash"
+git commit -m "VERCEL_SYNC_TEST_ZENTUS"
 git push
 pause
