@@ -215,8 +215,10 @@ def analyze_exam_file(
         if media_type == "application/pdf":
             # Try to extract text layer with pypdf
             extracted_text = ""
+            pypdf_ok = False
             try:
                 import pypdf as _pypdf
+                pypdf_ok = True
                 reader = _pypdf.PdfReader(_io.BytesIO(raw))
                 pages_text = []
                 for page in reader.pages:
@@ -230,8 +232,14 @@ def analyze_exam_file(
             except Exception as e:
                 print(f"[ANALYZE] ❌ pypdf LỖI: {type(e).__name__}: {e} — fallback Claude Vision", flush=True)
 
-            if len(extracted_text) >= 200:
-                print(f"[ANALYZE] ✅ Strategy: TEXT MODE (pypdf → Claude text)", flush=True)
+            # Kiểm tra chất lượng text: không chỉ đếm ký tự mà còn đếm từ thực sự
+            # PDF scan thường extract được rất ít text hoặc toàn ký tự rác
+            import re as _re
+            words = _re.findall(r'[a-zA-ZÀ-ỹ\d]{2,}', extracted_text)
+            text_quality_ok = len(extracted_text) >= 100 and len(words) >= 20
+
+            if text_quality_ok:
+                print(f"[ANALYZE] ✅ Strategy: TEXT MODE (pypdf → {len(words)} từ, {len(extracted_text)} ký tự)", flush=True)
                 user_content = [
                     {
                         "type": "text",
@@ -243,7 +251,8 @@ def analyze_exam_file(
                     }
                 ]
             else:
-                print(f"[ANALYZE] ⚠️  Strategy: VISION MODE (text quá ngắn={len(extracted_text)} ký tự → PDF scan)", flush=True)
+                reason = "pypdf chưa cài" if not pypdf_ok else f"text kém chất lượng ({len(words)} từ, {len(extracted_text)} ký tự → PDF scan)"
+                print(f"[ANALYZE] ⚠️  Strategy: VISION MODE ({reason})", flush=True)
                 encoded = base64.standard_b64encode(raw).decode("utf-8")
                 user_content = [
                     {
