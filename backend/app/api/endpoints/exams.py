@@ -169,6 +169,7 @@ def analyze_exam_file(
 
         if media_type == "application/pdf":
             # Try to extract text layer with pypdf
+            extracted_text = ""
             try:
                 import pypdf as _pypdf
                 reader = _pypdf.PdfReader(_io.BytesIO(raw))
@@ -178,11 +179,14 @@ def analyze_exam_file(
                     if t.strip():
                         pages_text.append(t)
                 extracted_text = "\n\n".join(pages_text).strip()
-            except Exception:
-                extracted_text = ""
+                print(f"[ANALYZE] pypdf OK — {len(reader.pages)} trang, {len(extracted_text)} ký tự", flush=True)
+            except ImportError:
+                print("[ANALYZE] ❌ pypdf CHƯA CÀI — fallback Claude Vision", flush=True)
+            except Exception as e:
+                print(f"[ANALYZE] ❌ pypdf LỖI: {type(e).__name__}: {e} — fallback Claude Vision", flush=True)
 
             if len(extracted_text) >= 200:
-                # PDF có text layer → gửi text thuần (rẻ hơn 10-20x)
+                print(f"[ANALYZE] ✅ Strategy: TEXT MODE (pypdf → Claude text)", flush=True)
                 user_content = [
                     {
                         "type": "text",
@@ -194,7 +198,7 @@ def analyze_exam_file(
                     }
                 ]
             else:
-                # PDF scan (không có text layer) → fallback Claude Vision
+                print(f"[ANALYZE] ⚠️  Strategy: VISION MODE (text quá ngắn={len(extracted_text)} ký tự → PDF scan)", flush=True)
                 encoded = base64.standard_b64encode(raw).decode("utf-8")
                 user_content = [
                     {
@@ -205,6 +209,7 @@ def analyze_exam_file(
                 ]
         else:
             # Ảnh → Claude Vision
+            print(f"[ANALYZE] 🖼️  Strategy: IMAGE VISION MODE ({media_type})", flush=True)
             encoded = base64.standard_b64encode(raw).decode("utf-8")
             user_content = [
                 {
