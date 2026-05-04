@@ -343,3 +343,55 @@ export async function createExamFromQuestions(token, { title, description, durat
   if (!response.ok) throw new Error(await _parseError(response, 'Lỗi khi tạo đề thi từ câu hỏi'));
   return response.json();
 }
+
+// Classroom API functions
+export async function getClassrooms(token, { skip = 0, limit = 20 } = {}) {
+  const response = await _authFetch(`${API_BASE_URL}/classrooms/?skip=${skip}&limit=${limit}`, {
+    method: 'GET', headers: {}
+  }, token);
+  if (!response.ok) throw new Error(await _parseError(response, 'Lỗi khi tải danh sách lớp'));
+  return response.json();
+}
+
+export async function createClassroom(token, data) {
+  const response = await _authFetch(`${API_BASE_URL}/classrooms/`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+    headers: { 'Content-Type': 'application/json' }
+  }, token);
+  if (!response.ok) throw new Error(await _parseError(response, 'Lỗi khi tạo lớp học'));
+  return response.json();
+}
+
+export async function getClassroom(token, classroomId) {
+  const response = await _authFetch(`${API_BASE_URL}/classrooms/${classroomId}`, {
+    method: 'GET', headers: {}
+  }, token);
+  if (!response.ok) throw new Error(await _parseError(response, 'Lỗi khi tải chi tiết lớp'));
+  return response.json();
+}
+
+export async function addStudentToClass(token, classroomId, studentId) {
+  const response = await _authFetch(`${API_BASE_URL}/classrooms/${classroomId}/students?student_id=${studentId}`, {
+    method: 'POST', headers: {}
+  }, token);
+  if (!response.ok) throw new Error(await _parseError(response, 'Lỗi khi thêm học sinh vào lớp'));
+  return response.json();
+}
+
+export async function removeStudentFromClass(token, classroomId, studentId) {
+  const response = await _authFetch(`${API_BASE_URL}/classrooms/${classroomId}/students/${student_id}`, {
+    method: 'DELETE', headers: {}
+  }, token);
+  if (!response.ok) throw new Error(await _parseError(response, 'Lỗi khi xóa học sinh khỏi lớp'));
+  return response.json();
+}
+
+export async function assignExamToClass(token, classroomId, examId, dueDate = null) {
+  const response = await _authFetch(`${API_BASE_URL}/classrooms/${classroomId}/assign-exam?exam_id=${examId}${dueDate ? `&due_date=${dueDate}` : ''}`, {
+    method: 'POST', headers: {}
+  }, token);
+  if (!response.ok) throw new Error(await _parseError(response, 'Lỗi khi giao bài cho lớp'));
+  return response.json();
+}
+

@@ -254,7 +254,16 @@ export default function Dashboard() {
         {/* Navigation Cards */}
         <div>
           <h2 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-4">Chức năng</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <NavCard
+              to="/classrooms"
+              gradient="bg-gradient-to-br from-indigo-500 to-indigo-700"
+              iconBg="bg-gradient-to-br from-indigo-500 to-indigo-700"
+              icon={<svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>}
+              title="Quản lý lớp học"
+              desc={isTeacher ? "Tạo lớp, thêm học sinh và giao bài tập cho cả lớp cùng lúc." : "Xem danh sách lớp học và các thông báo từ giáo viên."}
+              badge={isTeacher ? "Mới" : null}
+            />
             {isTeacher && (
               <NavCard
                 to="/students"

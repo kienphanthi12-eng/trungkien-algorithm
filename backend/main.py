@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
-from app.api.endpoints import auth, students, problems, exams, assignments, submissions, chat
+from app.api.endpoints import auth, students, problems, exams, assignments, submissions, chat, classrooms
 
 import os
 
@@ -37,6 +37,7 @@ app.include_router(exams.router, prefix="/exams", tags=["Exams"])
 app.include_router(assignments.router, prefix="/assignments", tags=["Assignments"])
 app.include_router(submissions.router, prefix="/submissions", tags=["Submissions"])
 app.include_router(chat.router, prefix="/chat", tags=["Chat"])
+app.include_router(classrooms.router, prefix="/classrooms", tags=["Classrooms"])
 
 @app.get("/")
 def read_root():

@@ -13,6 +13,8 @@ import AssignmentDetail from './pages/AssignmentDetail'
 import Exams from './pages/Exams'
 import CreateExam from './pages/CreateExam'
 import AnalyzeExam from './pages/AnalyzeExam'
+import ClassroomList from './pages/ClassroomList'
+import ClassroomDetail from './pages/ClassroomDetail'
 import ExamDetail from './pages/ExamDetail'
 
 function App() {
