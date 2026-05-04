@@ -32,7 +32,33 @@ QUY TẮC:
 - Nếu Đúng/Sai → problem_type = "true_false"
 - Còn lại → problem_type = "essay"
 - Giữ nguyên ký tự đặc biệt, công thức toán học trong description
-- Nếu không nhận diện được câu hỏi nào → trả về []"""
+- Nếu không nhận diện được câu hỏi nào → trả về []"
+
+
+VARIANT_SYSTEM_PROMPT = """Bạn là chuyên gia biên soạn đề thi. Nhiệm vụ của bạn là tạo ra một 'biến thể' (Variant) của bộ đề thi được cung cấp.
+
+YÊU CẦU:
+1. Giữ nguyên số lượng câu hỏi.
+2. Giữ nguyên loại câu hỏi (multiple_choice, true_false, essay) và độ khó cho từng câu tương ứng.
+3. Thay đổi dữ kiện chi tiết: 
+   - Toán/Lý/Hóa: Thay đổi con số, giá trị (phải đảm bảo tính toán ra kết quả hợp lý).
+   - Văn học/Tiếng Anh: Thay đổi ngữ cảnh, nhân vật hoặc đoạn văn tương tự.
+   - Trắc nghiệm: Thay đổi cả nội dung các phương án nhiễu nhưng giữ nguyên đáp án đúng là một lựa chọn hợp lý.
+4. Trả về mảng JSON đúng định dạng đã cho.
+
+ĐỊNH DẠNG JSON MỖI CÂU HỎI:
+{
+  "title": "Tiêu đề câu",
+  "description": "Nội dung câu hỏi mới đã được biến đổi",
+  "problem_type": "loại câu",
+  "choices": {"A": "...", "B": "...", "C": "...", "D": "..."},
+  "correct_answer": "đáp án đúng",
+  "difficulty": "độ khó",
+  "category": "chủ đề",
+  "solution": "Lời giải chi tiết cho câu hỏi mới này"
+}
+
+QUY TẮC: Trả về DUY NHẤT một mảng JSON hợp lệ, KHÔNG có text nào khác."""""
 
 
 # ─── Schemas for create-from-questions ──────────────────────────────────────────
@@ -464,6 +490,83 @@ def create_exam(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Lỗi khi tạo đề thi: {str(e)}",
         )
+
+@router.post("/{exam_id}/generate-variants")
+def generate_exam_variant(
+    exam_id: UUID,
+    current_user=Depends(get_current_teacher),
+):
+    """
+    Generate a new exam variant using AI based on an existing exam.
+    """
+    # 1. Fetch original exam with problems
+    resp = supabase_client.table("exams").select("*").eq("id", str(exam_id)).execute()
+    if not resp.data:
+        raise HTTPException(status_code=404, detail="Không tìm thấy đề thi gốc.")
+    
+    original_exam = _enrich_exams([resp.data[0]])[0]
+    problems = original_exam.get("problems", [])
+    if not problems:
+        raise HTTPException(status_code=400, detail="Đề thi này chưa có câu hỏi nào để tạo biến thể.")
+
+    # 2. Prepare questions for AI
+    source_questions = []
+    for ep in problems:
+        p = ep.get("problem")
+        if p:
+            source_questions.append({
+                "title": p.get("title"),
+                "description": p.get("description"),
+                "problem_type": p.get("problem_type"),
+                "choices": p.get("choices"),
+                "correct_answer": p.get("correct_answer"),
+                "difficulty": p.get("difficulty"),
+                "category": p.get("category"),
+            })
+
+    # 3. Call AI
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+    if not api_key:
+        raise HTTPException(status_code=500, detail="ANTHROPIC_API_KEY chưa cấu hình.")
+
+    try:
+        import urllib.request as _urllib_req
+        payload_bytes = json.dumps({
+            "model": "claude-3-5-sonnet-20241022", # Sử dụng Sonnet cho chất lượng cao hơn khi soạn đề
+            "max_tokens": 8000,
+            "system": VARIANT_SYSTEM_PROMPT,
+            "messages": [{"role": "user", "content": f"Hãy tạo biến thể cho bộ đề sau đây:\n\n{json.dumps(source_questions, ensure_ascii=False)}"}],
+        }).encode("utf-8")
+
+        _req = _urllib_req.Request(
+            "https://api.anthropic.com/v1/messages",
+            data=payload_bytes,
+            headers={
+                "x-api-key": api_key,
+                "anthropic-version": "2023-06-01",
+                "content-type": "application/json",
+            },
+            method="POST",
+        )
+        with _urllib_req.urlopen(_req, timeout=300) as _resp:
+            _result = json.loads(_resp.read().decode("utf-8"))
+
+        raw_text = _result["content"][0]["text"]
+        new_questions_data = _parse_json_from_llm(raw_text)
+
+        # 4. Create the new variant exam
+        new_exam_data = ExamFromQuestions(
+            title=f"[Biến thể AI] {original_exam['title']}",
+            description=f"Đề thi biến thể được tạo tự động từ đề: {original_exam['title']}",
+            duration=original_exam.get("duration", 60),
+            questions=[ExtractedQuestion(**q) for q in new_questions_data]
+        )
+
+        return create_exam_from_questions(new_exam_data, current_user)
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Lỗi khi tạo biến thể AI: {str(e)}")
+
 
 
 @router.delete("/{exam_id}")

@@ -220,6 +220,14 @@ export async function deleteExam(token, examId) {
   return response.json();
 }
 
+export async function generateExamVariant(token, examId) {
+  const response = await _authFetch(`${API_BASE_URL}/exams/${examId}/generate-variants`, {
+    method: 'POST', headers: {}
+  }, token);
+  if (!response.ok) throw new Error(await _parseError(response, 'Lỗi khi tạo biến thể AI'));
+  return response.json();
+}
+
 // Assignment API functions
 export async function getAssignments(token, { studentId, status, skip = 0, limit = 20 } = {}) {
   let url = `${API_BASE_URL}/assignments/?skip=${skip}&limit=${limit}`;

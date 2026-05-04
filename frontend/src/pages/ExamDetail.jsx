@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { getExam, getStudents, createAssignment } from '../services/api';
+import { getExam, getStudents, createAssignment, generateExamVariant } from '../services/api';
+import MarkdownRenderer from '../components/MarkdownRenderer';
 import logo from '../assets/logo.png';
 
 const DIFFICULTY_LABELS = { easy: 'Dễ', medium: 'Trung bình', hard: 'Khó' };
@@ -38,6 +39,7 @@ export default function ExamDetail() {
 
   // Expanded question
   const [expandedIdx, setExpandedIdx] = useState(null);
+  const [variantLoading, setVariantLoading] = useState(false);
 
   useEffect(() => {
     loadExam();
@@ -52,6 +54,22 @@ export default function ExamDetail() {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCreateVariant = async () => {
+    if (!window.confirm('AI sẽ tạo một bộ đề mới dựa trên cấu trúc đề này nhưng thay đổi nội dung câu hỏi. Bạn muốn tiếp tục?')) return;
+    
+    setVariantLoading(true);
+    try {
+      const newExam = await generateExamVariant(token, examId);
+      navigate(`/exams/${newExam.id}`);
+      window.scrollTo(0, 0);
+      alert('Đã tạo đề biến thể mới thành công!');
+    } catch (err) {
+      alert('Lỗi khi tạo biến thể: ' + err.message);
+    } finally {
+      setVariantLoading(false);
     }
   };
 
@@ -102,6 +120,20 @@ export default function ExamDetail() {
     );
   }
 
+  if (variantLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-center">
+        <div className="relative mb-8">
+          <div className="absolute inset-0 bg-blue-400 rounded-full blur-2xl opacity-20 animate-pulse" />
+          <div className="relative animate-spin rounded-full h-20 w-20 border-t-4 border-b-4 border-blue-600" />
+          <div className="absolute inset-0 flex items-center justify-center text-xl">✨</div>
+        </div>
+        <h2 className="text-2xl font-black text-slate-900 mb-2">Đang soạn đề biến thể...</h2>
+        <p className="text-slate-500 max-w-sm">AI của ZENTUS đang phân tích đề gốc và tạo ra các câu hỏi tương đương cho bạn.</p>
+      </div>
+    );
+  }
+
   if (error || !exam) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -140,14 +172,22 @@ export default function ExamDetail() {
             </div>
             <div className="flex items-center gap-3">
               {user?.role === 'teacher' && (
-                <button
-                  onClick={openModal}
-                  className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-sm font-bold rounded-xl shadow-lg shadow-blue-200 hover:scale-105 transition-all"
-                >
-                  📤 Giao đề thi
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleCreateVariant}
+                    className="hidden sm:flex px-4 py-2.5 bg-white border border-blue-200 text-blue-600 text-sm font-bold rounded-xl hover:bg-blue-50 transition-all items-center gap-2"
+                  >
+                    ✨ Tạo biến thể AI
+                  </button>
+                  <button
+                    onClick={openModal}
+                    className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-sm font-bold rounded-xl shadow-lg shadow-blue-200 hover:scale-105 transition-all"
+                  >
+                    📤 Giao đề thi
+                  </button>
+                </div>
               )}
-              <Link to="/exams" className="text-sm font-bold text-slate-500 hover:text-slate-900 transition-colors">
+              <Link to="/exams" className="hidden sm:block text-sm font-bold text-slate-500 hover:text-slate-900 transition-colors">
                 ← Kho đề
               </Link>
             </div>
@@ -234,7 +274,7 @@ export default function ExamDetail() {
                       <div className="border-t border-slate-100 px-5 py-5 bg-slate-50/50 space-y-4">
                         <div>
                           <p className="text-xs font-bold text-slate-500 mb-1">Nội dung câu hỏi</p>
-                          <p className="text-slate-800 text-sm leading-relaxed whitespace-pre-wrap">{p.description}</p>
+                          <MarkdownRenderer content={p.description} className="text-sm" />
                         </div>
 
                         {/* MCQ choices */}
@@ -251,7 +291,9 @@ export default function ExamDetail() {
                                     ${p.correct_answer === key ? 'bg-green-500 text-white' : 'bg-slate-200 text-slate-500'}`}>
                                     {key}
                                   </span>
-                                  {val}
+                                  <div className="flex-1">
+                                    <MarkdownRenderer content={val} className="text-sm" />
+                                  </div>
                                   {p.correct_answer === key && <span className="ml-auto text-green-600 text-xs">✓ Đúng</span>}
                                 </div>
                               ))}
@@ -274,7 +316,9 @@ export default function ExamDetail() {
                         {p.solution && (
                           <div>
                             <p className="text-xs font-bold text-slate-500 mb-1">Lời giải</p>
-                            <p className="text-slate-700 text-sm bg-blue-50 rounded-xl p-3 border border-blue-100">{p.solution}</p>
+                            <div className="bg-blue-50 rounded-xl p-3 border border-blue-100">
+                              <MarkdownRenderer content={p.solution} className="text-sm text-blue-900" />
+                            </div>
                           </div>
                         )}
 
