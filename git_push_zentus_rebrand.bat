@@ -1,5 +1,5 @@
 @echo off
 git add .
-git commit -m "Rebranding project to ZENTUS: updated logo, names, and documentation"
+git commit -m "FIX_FINAL: Add lucide-react and resolve ExamDetail crash"
 git push
 pause
