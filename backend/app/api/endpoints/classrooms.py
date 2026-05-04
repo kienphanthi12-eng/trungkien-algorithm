@@ -21,23 +21,19 @@ def get_classrooms(
         print(f"[Debug] User: {current_user.email}, Detected Role: {user_role}")
         
         if user_role == 'teacher':
-
-            # Get teacher's classrooms - Simplified query
-            print(f"[Debug] Fetching classrooms for teacher_id: {current_user.id}")
+            # Get teacher's classrooms
             resp = supabase_client.table("classrooms")\
-                .select("*")\
+                .select("*, classroom_students(count)")\
                 .eq("teacher_id", str(current_user.id))\
                 .range(skip, skip + limit - 1)\
                 .order("created_at", desc=True)\
                 .execute()
             
-            print(f"[Debug] Supabase response data: {resp.data}")
-            
             # Count total
             count_resp = supabase_client.table("classrooms").select("*", count="exact").eq("teacher_id", str(current_user.id)).execute()
             total = count_resp.count or 0
         else:
-            # Student logic remains similar but simplified
+            # Student logic
             sub_resp = supabase_client.table("classroom_students").select("classroom_id").eq("student_id", str(current_user.id)).execute()
             class_ids = [r["classroom_id"] for r in sub_resp.data or []]
             
@@ -45,17 +41,17 @@ def get_classrooms(
                 return {"classrooms": [], "total": 0}
                 
             resp = supabase_client.table("classrooms")\
-                .select("*")\
+                .select("*, classroom_students(count)")\
                 .in_("id", class_ids)\
                 .range(skip, skip + limit - 1)\
                 .execute()
             total = len(class_ids)
 
-        # Process counts (simplified for now)
+        # Process counts
         classrooms = []
         for c in resp.data or []:
-            # We'll set a default for now, can improve later
-            c["student_count"] = 0 
+            counts = c.get("classroom_students", [])
+            c["student_count"] = counts[0]["count"] if counts else 0
             classrooms.append(c)
             
         return {"classrooms": classrooms, "total": total}
