@@ -599,31 +599,65 @@ def generate_exam_variant(
                 "category": p.get("category"),
             })
 
-    # 3. Call DeepSeek AI
+    # 3. Call DeepSeek AI — chia batch 5 câu để tránh bị cắt JSON
     api_key = os.environ.get("DEEPSEEK_API_KEY", "").strip()
     if not api_key:
         raise HTTPException(status_code=500, detail="Chưa cấu hình DEEPSEEK_API_KEY.")
 
-    try:
-        import httpx
-        print("[VARIANT] Using DeepSeek...", flush=True)
-        resp = httpx.post(
+    def _call_variant_batch(batch: list, batch_idx: int) -> list:
+        """Gọi DeepSeek cho 1 batch câu hỏi, trả về list variants."""
+        import httpx as _httpx
+        print(f"[VARIANT] Batch {batch_idx}: {len(batch)} câu...", flush=True)
+        r = _httpx.post(
             "https://api.deepseek.com/chat/completions",
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
             json={
                 "model": "deepseek-chat",
                 "messages": [
                     {"role": "system", "content": VARIANT_SYSTEM_PROMPT},
-                    {"role": "user", "content": f"Hãy tạo biến thể cho bộ đề sau đây:\n\n{json.dumps(source_questions, ensure_ascii=False)}"},
+                    {"role": "user", "content": f"Tạo biến thể cho {len(batch)} câu hỏi sau:\n\n{json.dumps(batch, ensure_ascii=False)}"},
                 ],
                 "temperature": 0.7,
                 "max_tokens": 8000,
             },
             timeout=300.0,
         )
-        resp.raise_for_status()
-        raw_text = resp.json()["choices"][0]["message"]["content"]
-        new_questions_data = _parse_json_from_llm(raw_text)
+        r.raise_for_status()
+        choice = r.json()["choices"][0]
+        if choice.get("finish_reason") == "length":
+            # Bị cắt → thử lại với từng câu riêng lẻ
+            print(f"[VARIANT] Batch {batch_idx} bị cắt → retry từng câu", flush=True)
+            results = []
+            for single in batch:
+                rs = _httpx.post(
+                    "https://api.deepseek.com/chat/completions",
+                    headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                    json={
+                        "model": "deepseek-chat",
+                        "messages": [
+                            {"role": "system", "content": VARIANT_SYSTEM_PROMPT},
+                            {"role": "user", "content": f"Tạo biến thể cho 1 câu hỏi sau:\n\n{json.dumps([single], ensure_ascii=False)}"},
+                        ],
+                        "temperature": 0.7,
+                        "max_tokens": 4000,
+                    },
+                    timeout=120.0,
+                )
+                rs.raise_for_status()
+                parsed = _parse_json_from_llm(rs.json()["choices"][0]["message"]["content"])
+                results.extend(parsed)
+            return results
+        raw = choice["message"]["content"]
+        return _parse_json_from_llm(raw)
+
+    try:
+        BATCH_SIZE = 5
+        new_questions_data = []
+        for i in range(0, len(source_questions), BATCH_SIZE):
+            batch = source_questions[i:i + BATCH_SIZE]
+            variants = _call_variant_batch(batch, i // BATCH_SIZE + 1)
+            new_questions_data.extend(variants)
+        print(f"[VARIANT] ✅ Tổng {len(new_questions_data)} câu biến thể", flush=True)
 
 
         # 4. Create the new variant exam

@@ -9,8 +9,17 @@ import rehypeKatex from 'rehype-katex';
 export default function MarkdownRenderer({ content, className = "" }) {
   if (!content) return null;
 
+  // Tiền xử lý để hỗ trợ các ký tự LaTeX mà AI hay sinh ra (như \( \) hoặc \[ \])
+  const preProcessContent = (text) => {
+    return text
+      .replace(/\\\((.*?)\\\)/g, '$$$1$$') // Chuyển \( \) thành $ $
+      .replace(/\\\[(.*?)\\\]/g, '$$$$$1$$$$'); // Chuyển \[ \] thành $$ $$
+  };
+
+  const processedContent = preProcessContent(content);
+
   return (
-    <div className={`prose prose-slate max-w-none ${className}`}>
+    <div className={`prose prose-slate max-w-none prose-math:my-4 ${className}`}>
       <ReactMarkdown
         remarkPlugins={[remarkMath]}
         rehypePlugins={[rehypeKatex]}
@@ -26,7 +35,7 @@ export default function MarkdownRenderer({ content, className = "" }) {
           td: ({ node, ...props }) => <td {...props} className="px-4 py-2 border-t border-gray-100 text-sm" />,
         }}
       >
-        {content}
+        {processedContent}
       </ReactMarkdown>
     </div>
   );
