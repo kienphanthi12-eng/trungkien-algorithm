@@ -220,8 +220,10 @@ def analyze_exam_file(
                 ),
             )
 
-        # ── Trích xuất text bằng pypdf ────────────────────────────────────
+        # ── Trích xuất text: thử pypdf trước, fallback PyMuPDF ───────────
         extracted_text = ""
+
+        # Bước 1: pypdf
         try:
             import pypdf as _pypdf
             reader = _pypdf.PdfReader(_io.BytesIO(raw))
@@ -232,21 +234,39 @@ def analyze_exam_file(
                     pages_text.append(t)
             extracted_text = "\n\n".join(pages_text).strip()
             print(f"[ANALYZE] pypdf: {len(reader.pages)} trang, {len(extracted_text)} ký tự", flush=True)
-        except ImportError:
-            raise HTTPException(status_code=500, detail="pypdf chưa được cài trên server. Vui lòng liên hệ admin.")
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Không đọc được file PDF: {str(e)}")
+            print(f"[ANALYZE] pypdf lỗi: {e}", flush=True)
 
-        # Kiểm tra chất lượng text
+        # Bước 2: nếu pypdf cho ít text → thử PyMuPDF (tốt hơn với font đặc biệt, MathType, v.v.)
         words = _re.findall(r'[a-zA-ZÀ-ỹ\d]{2,}', extracted_text)
+        if len(words) < 20:
+            print(f"[ANALYZE] pypdf kém ({len(words)} từ) → thử PyMuPDF...", flush=True)
+            try:
+                import fitz  # PyMuPDF
+                doc = fitz.open(stream=raw, filetype="pdf")
+                pages_text = []
+                for page in doc:
+                    t = page.get_text("text") or ""
+                    if t.strip():
+                        pages_text.append(t)
+                fitz_text = "\n\n".join(pages_text).strip()
+                fitz_words = _re.findall(r'[a-zA-ZÀ-ỹ\d]{2,}', fitz_text)
+                print(f"[ANALYZE] PyMuPDF: {len(doc)} trang, {len(fitz_text)} ký tự, {len(fitz_words)} từ", flush=True)
+                if len(fitz_words) > len(words):
+                    extracted_text = fitz_text
+                    words = fitz_words
+            except ImportError:
+                print("[ANALYZE] PyMuPDF chưa cài", flush=True)
+            except Exception as e:
+                print(f"[ANALYZE] PyMuPDF lỗi: {e}", flush=True)
+
         if len(extracted_text) < 100 or len(words) < 20:
             raise HTTPException(
                 status_code=400,
                 detail=(
-                    f"PDF này không chứa text (có thể là file scan hoặc ảnh chụp). "
-                    f"DeepSeek chỉ đọc được PDF digital có text layer. "
-                    f"Vui lòng xuất PDF từ Word/Google Docs thay vì scan/chụp ảnh. "
-                    f"(Đọc được {len(words)} từ, cần ít nhất 20 từ)"
+                    f"Không đọc được text từ PDF này (đọc được {len(words)} từ). "
+                    f"File có thể là PDF scan/ảnh chụp. "
+                    f"Vui lòng xuất PDF từ Word/Google Docs để có text layer."
                 ),
             )
 
