@@ -162,7 +162,7 @@ export default function AnalyzeExam() {
                 <span className="text-xl font-black bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600">
                   AI PHÂN TÍCH ĐỀ THI
                 </span>
-                <p className="text-xs text-slate-400 font-medium">Upload PDF / ảnh → Claude Vision trích xuất câu hỏi</p>
+                <p className="text-xs text-slate-400 font-medium">Upload PDF digital → DeepSeek AI trích xuất câu hỏi</p>
               </div>
             </div>
             <Link to="/exams" className="text-sm font-bold text-slate-500 hover:text-slate-900 transition-colors">
@@ -202,9 +202,12 @@ export default function AnalyzeExam() {
           <div className="bg-white/70 backdrop-blur-xl rounded-3xl border border-white/40 shadow-xl p-10">
             <h2 className="text-2xl font-black text-slate-900 mb-2">Tải lên đề thi</h2>
             <p className="text-slate-500 mb-8">
-              Hỗ trợ PDF, ảnh JPEG/PNG/WEBP. Tối đa 10 MB.<br />
-              Claude Vision sẽ tự động nhận diện và trích xuất toàn bộ câu hỏi.
+              Chỉ hỗ trợ <strong>PDF digital</strong> (xuất từ Word/Google Docs). Tối đa 10 MB.<br />
+              DeepSeek AI sẽ trích xuất toàn bộ câu hỏi từ nội dung text của PDF.
             </p>
+            <div className="mb-6 p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-700 text-xs">
+              ⚠️ <strong>Lưu ý:</strong> Không hỗ trợ PDF scan (ảnh chụp). Nếu đề thi là file scan, hãy dùng phần mềm OCR chuyển thành PDF có text trước.
+            </div>
 
             {/* Drop zone */}
             <div
@@ -218,7 +221,7 @@ export default function AnalyzeExam() {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".pdf,image/jpeg,image/png,image/webp"
+                accept=".pdf"
                 className="hidden"
                 onChange={handleFileSelect}
               />
@@ -239,7 +242,7 @@ export default function AnalyzeExam() {
                   <div className="text-5xl mb-4">☁️</div>
                   <p className="font-bold text-slate-600 text-lg">Kéo thả file vào đây</p>
                   <p className="text-slate-400 text-sm mt-1">hoặc click để chọn file</p>
-                  <p className="text-slate-300 text-xs mt-3">PDF • JPEG • PNG • WEBP — tối đa 10 MB</p>
+                  <p className="text-slate-300 text-xs mt-3">PDF digital — tối đa 10 MB</p>
                 </div>
               )}
             </div>

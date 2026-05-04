@@ -210,93 +210,60 @@ def analyze_exam_file(
         import io as _io
         import re as _re
 
-        messages_content = []
+        # ── Chỉ hỗ trợ PDF có text layer (deepseek-chat là text-only) ─────
+        if media_type != "application/pdf":
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "DeepSeek chỉ hỗ trợ PDF có text layer, không phân tích được ảnh trực tiếp. "
+                    "Vui lòng tải lên file PDF (xuất từ Word/Google Docs)."
+                ),
+            )
 
-        if media_type == "application/pdf":
-            # Strategy 1: pypdf text extraction (rẻ nhất, không cần vision)
-            extracted_text = ""
-            pypdf_ok = False
-            try:
-                import pypdf as _pypdf
-                pypdf_ok = True
-                reader = _pypdf.PdfReader(_io.BytesIO(raw))
-                pages_text = []
-                for page in reader.pages:
-                    t = page.extract_text() or ""
-                    if t.strip():
-                        pages_text.append(t)
-                extracted_text = "\n\n".join(pages_text).strip()
-                print(f"[ANALYZE] pypdf OK — {len(reader.pages)} trang, {len(extracted_text)} ký tự", flush=True)
-            except ImportError:
-                print("[ANALYZE] ❌ pypdf chưa cài", flush=True)
-            except Exception as e:
-                print(f"[ANALYZE] ❌ pypdf lỗi: {e}", flush=True)
+        # ── Trích xuất text bằng pypdf ────────────────────────────────────
+        extracted_text = ""
+        try:
+            import pypdf as _pypdf
+            reader = _pypdf.PdfReader(_io.BytesIO(raw))
+            pages_text = []
+            for page in reader.pages:
+                t = page.extract_text() or ""
+                if t.strip():
+                    pages_text.append(t)
+            extracted_text = "\n\n".join(pages_text).strip()
+            print(f"[ANALYZE] pypdf: {len(reader.pages)} trang, {len(extracted_text)} ký tự", flush=True)
+        except ImportError:
+            raise HTTPException(status_code=500, detail="pypdf chưa được cài trên server. Vui lòng liên hệ admin.")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Không đọc được file PDF: {str(e)}")
 
-            words = _re.findall(r'[a-zA-ZÀ-ỹ\d]{2,}', extracted_text)
-            text_quality_ok = len(extracted_text) >= 100 and len(words) >= 20
+        # Kiểm tra chất lượng text
+        words = _re.findall(r'[a-zA-ZÀ-ỹ\d]{2,}', extracted_text)
+        if len(extracted_text) < 100 or len(words) < 20:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"PDF này không chứa text (có thể là file scan hoặc ảnh chụp). "
+                    f"DeepSeek chỉ đọc được PDF digital có text layer. "
+                    f"Vui lòng xuất PDF từ Word/Google Docs thay vì scan/chụp ảnh. "
+                    f"(Đọc được {len(words)} từ, cần ít nhất 20 từ)"
+                ),
+            )
 
-            if text_quality_ok:
-                print(f"[ANALYZE] ✅ TEXT MODE — {len(words)} từ, {len(extracted_text)} ký tự", flush=True)
-                messages_content = [
-                    {
-                        "type": "text",
-                        "text": (
-                            "Đây là nội dung đề thi được trích xuất từ PDF:\n\n"
-                            + extracted_text
-                            + "\n\nHãy trích xuất tất cả câu hỏi và trả về mảng JSON theo định dạng đã yêu cầu."
-                        ),
-                    }
-                ]
-            else:
-                # Strategy 2: PDF scan → convert pages to JPEG via PyMuPDF → DeepSeek Vision
-                print(f"[ANALYZE] ⚠️ PDF scan ({len(words)} từ) → PyMuPDF convert to JPEG", flush=True)
-                try:
-                    import fitz  # PyMuPDF
-                    doc = fitz.open(stream=raw, filetype="pdf")
-                    img_parts = []
-                    for page_num in range(min(len(doc), 5)):  # tối đa 5 trang
-                        page = doc[page_num]
-                        pix = page.get_pixmap(dpi=150)
-                        jpeg_bytes = pix.tobytes("jpeg")
-                        b64 = base64.standard_b64encode(jpeg_bytes).decode("utf-8")
-                        img_parts.append({
-                            "type": "image_url",
-                            "image_url": {"url": f"data:image/jpeg;base64,{b64}"},
-                        })
-                    img_parts.append({
-                        "type": "text",
-                        "text": "Hãy trích xuất tất cả câu hỏi trong đề thi và trả về mảng JSON theo định dạng đã yêu cầu.",
-                    })
-                    messages_content = img_parts
-                    print(f"[ANALYZE] 🖼️ VISION MODE — {min(len(doc), 5)}/{len(doc)} trang", flush=True)
-                except ImportError:
-                    raise HTTPException(
-                        status_code=400,
-                        detail="PDF này là file scan (không có text). Vui lòng tải lên file ảnh (JPEG/PNG) thay thế.",
-                    )
-                except HTTPException:
-                    raise
-                except Exception as e:
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"Không thể xử lý PDF scan: {str(e)}. Vui lòng thử tải lên file ảnh.",
-                    )
-        else:
-            # Ảnh → DeepSeek Vision (image_url format)
-            print(f"[ANALYZE] 🖼️ IMAGE VISION MODE ({media_type})", flush=True)
-            encoded = base64.standard_b64encode(raw).decode("utf-8")
-            messages_content = [
-                {
-                    "type": "image_url",
-                    "image_url": {"url": f"data:{media_type};base64,{encoded}"},
-                },
-                {
-                    "type": "text",
-                    "text": "Hãy trích xuất tất cả câu hỏi trong đề thi và trả về mảng JSON theo định dạng đã yêu cầu.",
-                },
-            ]
+        print(f"[ANALYZE] ✅ TEXT MODE — {len(words)} từ, {len(extracted_text)} ký tự", flush=True)
 
-        # ── Call DeepSeek API (OpenAI-compatible) ─────────────────────────
+        # Giới hạn độ dài để tránh vượt token limit (~30k ký tự ≈ 10k tokens)
+        if len(extracted_text) > 30000:
+            extracted_text = extracted_text[:30000]
+            print(f"[ANALYZE] ⚠️ Text bị cắt còn 30000 ký tự", flush=True)
+
+        user_content = (
+            "Đây là nội dung đề thi được trích xuất từ PDF:\n\n"
+            + extracted_text
+            + "\n\nHãy trích xuất tất cả câu hỏi và trả về mảng JSON theo định dạng đã yêu cầu."
+        )
+
+        # ── Call DeepSeek API ─────────────────────────────────────────────
         resp = httpx.post(
             "https://api.deepseek.com/chat/completions",
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
@@ -306,12 +273,15 @@ def analyze_exam_file(
                 "temperature": 0.1,
                 "messages": [
                     {"role": "system", "content": ANALYZE_SYSTEM_PROMPT},
-                    {"role": "user", "content": messages_content},
+                    {"role": "user", "content": user_content},
                 ],
             },
             timeout=300.0,
         )
-        resp.raise_for_status()
+        if not resp.is_success:
+            body = resp.text[:500]
+            print(f"[ANALYZE] ❌ DeepSeek {resp.status_code}: {body}", flush=True)
+            raise HTTPException(status_code=500, detail=f"DeepSeek API lỗi {resp.status_code}: {body}")
         raw_text = resp.json()["choices"][0]["message"]["content"].strip()
         questions = _parse_json_from_llm(raw_text)
 
