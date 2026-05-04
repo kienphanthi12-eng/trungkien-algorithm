@@ -25,11 +25,17 @@ Với mỗi câu hỏi, trả về:
   "solution": "Lời giải/đáp án nếu có trong tài liệu, null nếu không có"
 }
 
-QUY TẮC ĐỊNH DẠNG:
+QUY TẮC ĐỊNH DẠNG (BẮT BUỘC):
 - Công thức toán học: Sử dụng $...$ cho inline và $$...$$ cho block.
-- Bảng số liệu: Sử dụng định dạng Markdown Table chuẩn (| x | y |) và LUÔN để một dòng trống trước và sau bảng.
-- Bảng biến thiên/Bảng phức tạp: Sử dụng môi trường LaTeX \\begin{array} ... \\end{array} để vẽ bảng chuyên nghiệp.
-- Trả về DUY NHẤT một mảng JSON hợp lệ, KHÔNG có text nào khác.
+- Bảng số liệu: Sử dụng định dạng Markdown Table chuẩn. 
+  QUAN TRỌNG: Mỗi hàng của bảng PHẢI nằm trên một dòng riêng biệt. Không được viết dính liền.
+  Ví dụ đúng:
+  | Header 1 | Header 2 |
+  |----------|----------|
+  | Row 1    | Data 1   |
+- Bảng biến thiên/Bảng phức tạp: Sử dụng môi trường LaTeX \\begin{array} ... \\end{array}.
+- LUÔN để một dòng trống trước và sau các khối bảng/toán học.
+- Trả về DUY NHẤT một mảng JSON hợp lệ. KHÔNG có text nào khác ngoài JSON.
 - Giữ nguyên các ký tự đặc biệt."""
 
 

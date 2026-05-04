@@ -9,11 +9,17 @@ import rehypeKatex from 'rehype-katex';
 export default function MarkdownRenderer({ content, className = "" }) {
   if (!content) return null;
 
-  // Tiền xử lý để hỗ trợ các ký tự LaTeX mà AI hay sinh ra (như \( \) hoặc \[ \])
+  // Tiền xử lý để hỗ trợ các ký tự LaTeX và sửa lỗi bảng Markdown bị dính dòng
   const preProcessContent = (text) => {
     return text
       .replace(/\\\((.*?)\\\)/g, '$$$1$$') // Chuyển \( \) thành $ $
-      .replace(/\\\[(.*?)\\\]/g, '$$$$$1$$$$'); // Chuyển \[ \] thành $$ $$
+      .replace(/\\\[(.*?)\\\]/g, '$$$$$1$$$$') // Chuyển \[ \] thành $$ $$
+      // Sửa lỗi bảng bị dính dòng: Tìm đoạn | |---| và ngắt dòng
+      .replace(/(\|[^\n]+)\|[ ]*(\|[- ]+\|)/g, '$1\n$2')
+      // Sửa lỗi hàng tiếp theo bị dính vào hàng trước
+      .replace(/(\|[- ]+\|)[ ]*(\|)/g, '$1\n$2')
+      // Sửa lỗi các hàng dữ liệu dính nhau
+      .replace(/(\|[^\n|]+\|)[ ]*(\|[^-\n|][^\n|]+\|)/g, '$1\n$2');
   };
 
   const processedContent = preProcessContent(content);
