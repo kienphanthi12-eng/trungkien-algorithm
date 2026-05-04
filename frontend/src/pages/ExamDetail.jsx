@@ -9,6 +9,10 @@ import FigureEditor from '../components/FigureEditor';
 import { useReactToPrint } from 'react-to-print';
 import React, { useRef } from 'react';
 import logo from '../assets/logo.png';
+import { 
+  Printer, Share2, Trash2, PlusCircle, History, 
+  ChevronDown, ChevronUp, Edit3, Save, X 
+} from 'lucide-react';
 
 const DIFFICULTY_LABELS = { easy: 'Dễ', medium: 'Trung bình', hard: 'Khó' };
 const DIFFICULTY_COLORS = {
@@ -288,7 +292,9 @@ export default function ExamDetail() {
           ) : (
             <div className="space-y-3">
               {problems.map((ep, idx) => {
+                if (!ep) return null;
                 const p = ep.problem || ep;
+                if (!p) return null;
                 const isExpanded = expandedIdx === idx;
                 return (
                   <div key={ep.id || idx} className="border border-slate-200 rounded-2xl overflow-hidden">
