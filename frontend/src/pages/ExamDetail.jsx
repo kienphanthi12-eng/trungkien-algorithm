@@ -30,7 +30,6 @@ export default function ExamDetail() {
   const navigate = useNavigate();
 
   const [exam, setExam] = useState(null);
-  const problems = exam?.problems || [];
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
