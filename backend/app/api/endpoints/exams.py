@@ -160,7 +160,10 @@ async def analyze_exam_file(
 
     try:
         import anthropic
-        client = anthropic.Anthropic(api_key=api_key)
+        # Use AsyncAnthropic — this is an async endpoint (needs await file.read()),
+        # calling the sync client inside an async function blocks the event loop
+        # and causes APIConnectionError. AsyncAnthropic + await is the correct fix.
+        client = anthropic.AsyncAnthropic(api_key=api_key)
 
         encoded = base64.standard_b64encode(raw).decode("utf-8")
 
@@ -184,7 +187,7 @@ async def analyze_exam_file(
                 },
             }
 
-        response = client.messages.create(
+        response = await client.messages.create(
             model="claude-sonnet-4-6",
             max_tokens=8000,
             system=ANALYZE_SYSTEM_PROMPT,
