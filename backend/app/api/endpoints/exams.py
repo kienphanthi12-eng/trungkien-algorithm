@@ -427,4 +427,38 @@ def create_exam(
 
         if exam_in.problem_ids:
             exam_problems = [
-                {"exam_id": exam_id, "problem_i
+                {"exam_id": exam_id, "problem_id": str(prob_id), "order_index": idx}
+                for idx, prob_id in enumerate(exam_in.problem_ids)
+            ]
+            supabase_client.table("exam_problems").insert(exam_problems).execute()
+
+        enriched = _enrich_exams([exam_response.data[0]])
+        return enriched[0]
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Lỗi khi tạo đề thi: {str(e)}",
+        )
+
+
+@router.delete("/{exam_id}")
+def delete_exam(
+    exam_id: UUID,
+    current_user=Depends(get_current_teacher),
+):
+    """Delete an exam (teacher only, must be creator)"""
+    try:
+        check = supabase_client.table("exams").select("created_by").eq("id", str(exam_id)).execute()
+        if not check.data:
+            raise HTTPException(status_code=404, detail="Không tìm thấy đề thi")
+        if check.data[0]["created_by"] != str(current_user.id):
+            raise HTTPException(status_code=403, detail="Bạn không có quyền xóa đề thi này")
+
+        supabase_client.table("exams").delete().eq("id", str(exam_id)).execute()
+        return {"message": "Đã xóa đề thi thành công"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Lỗi khi xóa đề thi: {str(e)}")
