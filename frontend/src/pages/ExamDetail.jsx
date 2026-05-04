@@ -5,6 +5,7 @@ import { getExam, getStudents, createAssignment, generateExamVariant } from '../
 import MarkdownRenderer from '../components/MarkdownRenderer';
 import PrintableExam from '../components/PrintableExam';
 import FigureRenderer from '../components/FigureRenderer';
+import FigureEditor from '../components/FigureEditor';
 import { useReactToPrint } from 'react-to-print';
 import React, { useRef } from 'react';
 import logo from '../assets/logo.png';
@@ -36,10 +37,11 @@ export default function ExamDetail() {
   const [showModal, setShowModal] = useState(false);
   const [students, setStudents] = useState([]);
   const [selectedStudent, setSelectedStudent] = useState('');
-  const [dueDate, setDueDate] = useState('');
+  const [editingProblem, setEditingProblem] = useState(null);
   const [assigning, setAssigning] = useState(false);
   const [assignError, setAssignError] = useState('');
   const [assignSuccess, setAssignSuccess] = useState(false);
+  const [dueDate, setDueDate] = useState('');
 
   // Expanded question
   const [expandedIdx, setExpandedIdx] = useState(null);
@@ -77,6 +79,27 @@ export default function ExamDetail() {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleUpdateFigure = async (problemId, newFigureJson) => {
+    try {
+      await updateProblem(token, problemId, { figure_json: newFigureJson });
+      // Update local state
+      setExam(prev => ({
+        ...prev,
+        problems: prev.problems.map(p => {
+          const problemObj = p.problem || p;
+          if (problemObj.id === problemId) {
+            return { ...p, problem: { ...problemObj, figure_json: newFigureJson } };
+          }
+          return p;
+        })
+      }));
+      setEditingProblem(null);
+      alert("Đã cập nhật hình vẽ!");
+    } catch (err) {
+      alert("Lỗi: " + err.message);
     }
   };
 
@@ -305,6 +328,26 @@ export default function ExamDetail() {
                           <p className="text-xs font-bold text-slate-500 mb-1">Nội dung câu hỏi</p>
                           <MarkdownRenderer content={p.description} className="text-sm" />
                           {p.figure_json && <FigureRenderer data={p.figure_json} />}
+
+                          {/* Editor Trigger */}
+                          {user?.role === 'teacher' && (
+                            <div className="mt-2">
+                              {editingProblem?.id === p.id ? (
+                                <FigureEditor 
+                                  initialData={p.figure_json} 
+                                  onSave={(data) => handleUpdateFigure(p.id, data)}
+                                  onCancel={() => setEditingProblem(null)}
+                                />
+                              ) : (
+                                <button 
+                                  onClick={() => setEditingProblem(p)}
+                                  className="text-xs flex items-center gap-1 text-blue-600 hover:text-blue-800 font-medium py-1 px-2 rounded-lg bg-blue-50 border border-blue-100"
+                                >
+                                  ✏️ {p.figure_json ? 'Sửa hình vẽ' : 'Thêm hình vẽ'}
+                                </button>
+                              )}
+                            </div>
+                          )}
                         </div>
 
                         {/* MCQ choices */}

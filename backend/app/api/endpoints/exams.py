@@ -158,7 +158,41 @@ def _parse_json_from_llm(text: str) -> list:
     return json.loads(text)
 
 
+class ProblemUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    problem_type: Optional[str] = None
+    choices: Optional[Dict[str, str]] = None
+    correct_answer: Optional[str] = None
+    difficulty: Optional[str] = None
+    category: Optional[str] = None
+    solution: Optional[str] = None
+    figure_json: Optional[Dict] = None
+
 # ─── Routes ──────────────────────────────────────────────────────────────────────
+
+@router.patch("/problems/{problem_id}")
+def update_problem(
+    problem_id: UUID,
+    data: ProblemUpdate,
+    current_user=Depends(get_current_teacher),
+):
+    """Cập nhật thông tin câu hỏi. Chỉ dành cho giáo viên."""
+    # Build update payload
+    payload = data.model_dump(exclude_unset=True)
+    if not payload:
+        raise HTTPException(status_code=400, detail="Không có dữ liệu cập nhật.")
+
+    resp = supabase_client.table("problems")\
+        .update(payload)\
+        .eq("id", str(problem_id))\
+        .execute()
+    
+    if not resp.data:
+        raise HTTPException(status_code=404, detail="Không tìm thấy câu hỏi hoặc không có quyền.")
+    
+    return resp.data[0]
+
 
 @router.get("/health")
 def health_check():
