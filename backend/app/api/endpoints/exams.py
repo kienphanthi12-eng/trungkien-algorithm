@@ -162,46 +162,64 @@ def analyze_exam_file(
 
     try:
         import urllib.request as _urllib_req
+        import io as _io
 
-        encoded = base64.standard_b64encode(raw).decode("utf-8")
+        # ── Strategy: PDF → extract text first (cheap), fallback vision if scan ──
+        user_content = []
 
-        # Build content block depending on type
         if media_type == "application/pdf":
-            file_block = {
-                "type": "document",
-                "source": {
-                    "type": "base64",
-                    "media_type": "application/pdf",
-                    "data": encoded,
-                },
-            }
-        else:
-            file_block = {
-                "type": "image",
-                "source": {
-                    "type": "base64",
-                    "media_type": media_type,
-                    "data": encoded,
-                },
-            }
+            # Try to extract text layer with pypdf
+            try:
+                import pypdf as _pypdf
+                reader = _pypdf.PdfReader(_io.BytesIO(raw))
+                pages_text = []
+                for page in reader.pages:
+                    t = page.extract_text() or ""
+                    if t.strip():
+                        pages_text.append(t)
+                extracted_text = "\n\n".join(pages_text).strip()
+            except Exception:
+                extracted_text = ""
 
-        # Use stdlib urllib (no httpx/asyncio) to avoid Railway connection issues.
+            if len(extracted_text) >= 200:
+                # PDF có text layer → gửi text thuần (rẻ hơn 10-20x)
+                user_content = [
+                    {
+                        "type": "text",
+                        "text": (
+                            "Đây là nội dung đề thi được trích xuất từ PDF:\n\n"
+                            + extracted_text
+                            + "\n\nHãy trích xuất tất cả câu hỏi và trả về mảng JSON theo định dạng đã yêu cầu."
+                        ),
+                    }
+                ]
+            else:
+                # PDF scan (không có text layer) → fallback Claude Vision
+                encoded = base64.standard_b64encode(raw).decode("utf-8")
+                user_content = [
+                    {
+                        "type": "document",
+                        "source": {"type": "base64", "media_type": "application/pdf", "data": encoded},
+                    },
+                    {"type": "text", "text": "Hãy trích xuất tất cả câu hỏi trong tài liệu này và trả về mảng JSON theo định dạng đã yêu cầu."},
+                ]
+        else:
+            # Ảnh → Claude Vision
+            encoded = base64.standard_b64encode(raw).decode("utf-8")
+            user_content = [
+                {
+                    "type": "image",
+                    "source": {"type": "base64", "media_type": media_type, "data": encoded},
+                },
+                {"type": "text", "text": "Hãy trích xuất tất cả câu hỏi trong tài liệu này và trả về mảng JSON theo định dạng đã yêu cầu."},
+            ]
+
+        # ── Call Claude via stdlib urllib ─────────────────────────────────
         payload_bytes = json.dumps({
             "model": "claude-haiku-4-5-20251001",
             "max_tokens": 8000,
             "system": ANALYZE_SYSTEM_PROMPT,
-            "messages": [
-                {
-                    "role": "user",
-                    "content": [
-                        file_block,
-                        {
-                            "type": "text",
-                            "text": "Hãy trích xuất tất cả câu hỏi trong tài liệu này và trả về mảng JSON theo định dạng đã yêu cầu.",
-                        },
-                    ],
-                }
-            ],
+            "messages": [{"role": "user", "content": user_content}],
         }).encode("utf-8")
 
         _req = _urllib_req.Request(
@@ -409,38 +427,4 @@ def create_exam(
 
         if exam_in.problem_ids:
             exam_problems = [
-                {"exam_id": exam_id, "problem_id": str(prob_id), "order_index": idx}
-                for idx, prob_id in enumerate(exam_in.problem_ids)
-            ]
-            supabase_client.table("exam_problems").insert(exam_problems).execute()
-
-        enriched = _enrich_exams([exam_response.data[0]])
-        return enriched[0]
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Lỗi khi tạo đề thi: {str(e)}",
-        )
-
-
-@router.delete("/{exam_id}")
-def delete_exam(
-    exam_id: UUID,
-    current_user=Depends(get_current_teacher),
-):
-    """Delete an exam (teacher only, must be creator)"""
-    try:
-        check = supabase_client.table("exams").select("created_by").eq("id", str(exam_id)).execute()
-        if not check.data:
-            raise HTTPException(status_code=404, detail="Không tìm thấy đề thi")
-        if check.data[0]["created_by"] != str(current_user.id):
-            raise HTTPException(status_code=403, detail="Bạn không có quyền xóa đề thi này")
-
-        supabase_client.table("exams").delete().eq("id", str(exam_id)).execute()
-        return {"message": "Đã xóa đề thi thành công"}
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Lỗi khi xóa đề thi: {str(e)}")
+                {"exam_id": exam_id, "problem_i
