@@ -134,8 +134,6 @@ def analyze_exam_file(
     Uses sync def (same pattern as grade_submission) to avoid uvloop/httpx
     APIConnectionError that occurs when using async def with Anthropic SDK.
     """
-    import anthropic
-
     # ── Validate file type ───────────────────────────────────────────────
     content_type = (file.content_type or "").lower()
     allowed = {
@@ -163,6 +161,8 @@ def analyze_exam_file(
         raise HTTPException(status_code=500, detail="ANTHROPIC_API_KEY chưa được cấu hình.")
 
     try:
+        import urllib.request as _urllib_req
+
         encoded = base64.standard_b64encode(raw).decode("utf-8")
 
         # Build content block depending on type
@@ -185,13 +185,12 @@ def analyze_exam_file(
                 },
             }
 
-        # Sync client — same pattern as grade_submission which works on Railway
-        client = anthropic.Anthropic(api_key=api_key, timeout=300.0)
-        response = client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=8000,
-            system=ANALYZE_SYSTEM_PROMPT,
-            messages=[
+        # Use stdlib urllib (no httpx/asyncio) to avoid Railway connection issues.
+        payload_bytes = json.dumps({
+            "model": "claude-haiku-4-5-20251001",
+            "max_tokens": 8000,
+            "system": ANALYZE_SYSTEM_PROMPT,
+            "messages": [
                 {
                     "role": "user",
                     "content": [
@@ -203,9 +202,23 @@ def analyze_exam_file(
                     ],
                 }
             ],
-        )
+        }).encode("utf-8")
 
-        raw_text = response.content[0].text
+        _req = _urllib_req.Request(
+            "https://api.anthropic.com/v1/messages",
+            data=payload_bytes,
+            headers={
+                "x-api-key": api_key,
+                "anthropic-version": "2023-06-01",
+                "content-type": "application/json",
+                "anthropic-beta": "pdfs-2024-09-25",
+            },
+            method="POST",
+        )
+        with _urllib_req.urlopen(_req, timeout=300) as _resp:
+            _result = json.loads(_resp.read().decode("utf-8"))
+
+        raw_text = _result["content"][0]["text"]
         questions = _parse_json_from_llm(raw_text)
 
         # Normalise fields
@@ -232,9 +245,16 @@ def analyze_exam_file(
     except HTTPException:
         raise
     except Exception as e:
+        import urllib.error as _urllib_err
+        if isinstance(e, _urllib_err.HTTPError):
+            body = e.read().decode("utf-8", errors="replace")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Anthropic API lỗi {e.code}: {body[:500]}",
+            )
         raise HTTPException(
             status_code=500,
-            detail=f"Lỗi khi phân tích đề thi: {str(e)}",
+            detail=f"Lỗi khi phân tích đề thi: {type(e).__name__}: {str(e)}",
         )
 
 
@@ -407,20 +427,3 @@ def create_exam(
 
 @router.delete("/{exam_id}")
 def delete_exam(
-    exam_id: UUID,
-    current_user=Depends(get_current_teacher),
-):
-    """Delete an exam (teacher only, must be creator)"""
-    try:
-        check = supabase_client.table("exams").select("created_by").eq("id", str(exam_id)).execute()
-        if not check.data:
-            raise HTTPException(status_code=404, detail="Không tìm thấy đề thi")
-        if check.data[0]["created_by"] != str(current_user.id):
-            raise HTTPException(status_code=403, detail="Bạn không có quyền xóa đề thi này")
-
-        supabase_client.table("exams").delete().eq("id", str(exam_id)).execute()
-        return {"message": "Đã xóa đề thi thành công"}
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Lỗi khi xóa đề thi: {str(e)}")
