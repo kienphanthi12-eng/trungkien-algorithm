@@ -329,8 +329,8 @@ export default function ExamDetail() {
                           <MarkdownRenderer content={p.description} className="text-sm" />
                           {p.figure_json && <FigureRenderer data={p.figure_json} />}
 
-                          {/* Editor Trigger */}
-                          {user?.role === 'teacher' && (
+                          {/* Editor Trigger - DEBUG: Show for everyone */}
+                          {true && (
                             <div className="mt-2">
                               {editingProblem?.id === p.id ? (
                                 <FigureEditor 
