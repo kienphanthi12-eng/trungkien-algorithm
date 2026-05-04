@@ -14,6 +14,9 @@ import {
 } from '../services/api';
 import { useNavigate } from 'react-router-dom';
 import MarkdownRenderer from '../components/MarkdownRenderer';
+import FigureRenderer from '../components/FigureRenderer';
+import FigureEditor from '../components/FigureEditor';
+import { updateProblem } from '../services/api';
 
 const STATUS_LABEL = {
   pending: { text: 'Chờ nộp', cls: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
@@ -50,6 +53,7 @@ export default function AssignmentDetail() {
   const [answerText, setAnswerText] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
+  const [editingProblem, setEditingProblem] = useState(false);
 
   // Grading state
   const [grading, setGrading] = useState(false);
@@ -138,6 +142,18 @@ export default function AssignmentDetail() {
       setGradeError(err.message);
     } finally {
       setGrading(false);
+    }
+  };
+
+  const handleUpdateFigure = async (newFigureJson) => {
+    if (!problem) return;
+    try {
+      await updateProblem(token, problem.id, { figure_json: newFigureJson });
+      setProblem(prev => ({ ...prev, figure_json: newFigureJson }));
+      setEditingProblem(false);
+      alert("Đã cập nhật hình vẽ!");
+    } catch (err) {
+      alert("Lỗi: " + err.message);
     }
   };
 
@@ -333,6 +349,27 @@ export default function AssignmentDetail() {
             <div className="bg-white shadow rounded-lg overflow-hidden mb-6 p-6">
               <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Nội dung đề bài</h2>
               <MarkdownRenderer content={problem.description} />
+              {problem.figure_json && <FigureRenderer data={problem.figure_json} />}
+
+              {/* Editor for Teacher */}
+              {user?.role === 'teacher' && (
+                <div className="mt-4 pt-4 border-t border-gray-100">
+                  {editingProblem ? (
+                    <FigureEditor 
+                      initialData={problem.figure_json}
+                      onSave={handleUpdateFigure}
+                      onCancel={() => setEditingProblem(false)}
+                    />
+                  ) : (
+                    <button 
+                      onClick={() => setEditingProblem(true)}
+                      className="text-xs flex items-center gap-1 text-blue-600 hover:text-blue-800 font-medium py-1.5 px-3 rounded-lg bg-blue-50 border border-blue-100"
+                    >
+                      ✏️ {problem.figure_json ? 'Sửa hình vẽ' : 'Thêm hình vẽ'}
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           )}
 

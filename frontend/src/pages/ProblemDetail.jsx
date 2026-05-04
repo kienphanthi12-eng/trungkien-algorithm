@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import logo from '../assets/logo.png';
-import { getProblem, getStudents, createAssignment } from '../services/api';
+import { getProblem, getStudents, createAssignment, updateProblem } from '../services/api';
 import MarkdownRenderer from '../components/MarkdownRenderer';
+import FigureRenderer from '../components/FigureRenderer';
+import FigureEditor from '../components/FigureEditor';
 
 
 
@@ -23,6 +25,7 @@ export default function ProblemDetail() {
   const [assigning, setAssigning] = useState(false);
   const [assignError, setAssignError] = useState('');
   const [assignSuccess, setAssignSuccess] = useState(false);
+  const [editingFigure, setEditingFigure] = useState(false);
 
   useEffect(() => {
     fetchProblem();
@@ -77,6 +80,17 @@ export default function ProblemDetail() {
       setAssignError(err.message);
     } finally {
       setAssigning(false);
+    }
+  };
+
+  const handleUpdateFigure = async (newFigureJson) => {
+    try {
+      await updateProblem(token, problemId, { figure_json: newFigureJson });
+      setProblem(prev => ({ ...prev, figure_json: newFigureJson }));
+      setEditingFigure(false);
+      alert("Đã cập nhật hình vẽ!");
+    } catch (err) {
+      alert("Lỗi: " + err.message);
     }
   };
 
@@ -192,6 +206,27 @@ export default function ProblemDetail() {
             <div className="mb-6 pb-6 border-b border-gray-200">
               <h2 className="text-lg font-semibold text-gray-900 mb-3">Đề bài</h2>
               <MarkdownRenderer content={problem.description} />
+              {problem.figure_json && <FigureRenderer data={problem.figure_json} />}
+
+              {/* Figure Editor for Teacher */}
+              {user?.role === 'teacher' && (
+                <div className="mt-4">
+                  {editingFigure ? (
+                    <FigureEditor 
+                      initialData={problem.figure_json}
+                      onSave={handleUpdateFigure}
+                      onCancel={() => setEditingFigure(false)}
+                    />
+                  ) : (
+                    <button 
+                      onClick={() => setEditingFigure(true)}
+                      className="text-xs flex items-center gap-1 text-blue-600 hover:text-blue-800 font-medium py-1.5 px-3 rounded-lg bg-blue-50 border border-blue-100"
+                    >
+                      ✏️ {problem.figure_json ? 'Sửa hình vẽ' : 'Thêm hình vẽ'}
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* MCQ choices */}
