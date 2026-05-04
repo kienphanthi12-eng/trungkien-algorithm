@@ -395,14 +395,6 @@ export async function assignExamToClass(token, classroomId, examId, dueDate = nu
   return response.json();
 }
 
-export async function updateProblem(token, problemId, data) {
-  const response = await _authFetch(`${API_BASE_URL}/problems/${problemId}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data)
-  }, token);
-  if (!response.ok) throw new Error(await _parseError(response, 'Lỗi khi cập nhật câu hỏi'));
-  return response.json();
-}
+
 
 
