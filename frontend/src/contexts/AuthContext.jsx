@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
-import { getMe, refreshToken as apiRefreshToken } from '../services/api';
+import { getMe, refreshToken as apiRefreshToken, setApiCallbacks } from '../services/api';
 
 const AuthContext = createContext();
 
@@ -80,6 +80,14 @@ export function AuthProvider({ children }) {
       return null;
     }
   }, [clearAuth, scheduleRefresh]);
+
+  // Register auto-refresh callbacks with api.js interceptor
+  useEffect(() => {
+    setApiCallbacks({
+      onRefresh: doRefresh,
+      onLogout: clearAuth,
+    });
+  }, [doRefresh, clearAuth]);
 
   // On mount: verify or refresh stored token
   useEffect(() => {
