@@ -275,7 +275,7 @@ def analyze_exam_file(
 
         # ── Call Claude via stdlib urllib ─────────────────────────────────
         payload_bytes = json.dumps({
-            "model": "claude-3-haiku-20240307",
+            "model": "claude-haiku-4-5-20251001",
             "max_tokens": 8000,
             "system": ANALYZE_SYSTEM_PROMPT,
             "messages": [{"role": "user", "content": user_content}],
@@ -566,7 +566,7 @@ def generate_exam_variant(
             print("[VARIANT] Falling back to Anthropic (Sonnet 3.5)...", flush=True)
             url = "https://api.anthropic.com/v1/messages"
             payload = {
-                "model": "claude-3-5-sonnet-20241022",
+                "model": "claude-sonnet-4-6",
                 "max_tokens": 8000,
                 "system": VARIANT_SYSTEM_PROMPT,
                 "messages": [{"role": "user", "content": f"Hãy tạo biến thể cho bộ đề sau đây:\n\n{json.dumps(source_questions, ensure_ascii=False)}"}],
