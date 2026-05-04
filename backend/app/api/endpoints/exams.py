@@ -156,7 +156,7 @@ def analyze_exam_file(
         raise HTTPException(status_code=400, detail="File quá lớn. Tối đa 10 MB.")
 
     # ── Encode & call Claude ─────────────────────────────────────────────
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
     if not api_key:
         raise HTTPException(status_code=500, detail="ANTHROPIC_API_KEY chưa được cấu hình.")
 
@@ -426,21 +426,4 @@ def create_exam(
 
 
 @router.delete("/{exam_id}")
-def delete_exam(
-    exam_id: UUID,
-    current_user=Depends(get_current_teacher),
-):
-    """Delete an exam (teacher only, must be creator)"""
-    try:
-        check = supabase_client.table("exams").select("created_by").eq("id", str(exam_id)).execute()
-        if not check.data:
-            raise HTTPException(status_code=404, detail="Không tìm thấy đề thi")
-        if check.data[0]["created_by"] != str(current_user.id):
-            raise HTTPException(status_code=403, detail="Bạn không có quyền xóa đề thi này")
-
-        supabase_client.table("exams").delete().eq("id", str(exam_id)).execute()
-        return {"message": "Đã xóa đề thi thành công"}
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Lỗi khi xóa đề thi: {str(e)}")
+def dele
