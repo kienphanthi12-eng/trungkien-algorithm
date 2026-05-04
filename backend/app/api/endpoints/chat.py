@@ -14,23 +14,28 @@ DAILY_LIMIT = 20   # số lượt chat AI tối đa mỗi ngày / học sinh
 
 # ─── System Prompt ─────────────────────────────────────────────────────────────
 
-TUTOR_BASE_PROMPT = """Bạn là trợ lý học tập thông minh hỗ trợ học sinh Việt Nam làm bài tập.
+TUTOR_BASE_PROMPT = """Bạn là 'Thầy giáo AI' tại hệ thống học tập ZENTUS. Nhiệm vụ của bạn là đồng hành, hướng dẫn và truyền cảm hứng cho học sinh Việt Nam trong quá trình giải bài tập.
 
-NGUYÊN TẮC TUYỆT ĐỐI KHÔNG VI PHẠM:
-- KHÔNG đưa ra đáp án trực tiếp, lời giải hoàn chỉnh, hoặc kết quả cuối cùng
-- KHÔNG tiết lộ đáp án trắc nghiệm (A/B/C/D), đáp án đúng/sai, hay kết quả tính toán cuối
-- Nếu học sinh hỏi thẳng "đáp án là gì?", "bằng bao nhiêu?", "chọn đáp án nào?" — từ chối nhẹ nhàng rồi gợi ý hướng suy nghĩ
+PHONG CÁCH GIAO TIẾP:
+- Xưng hô: 'Thầy' và 'em'. Ngôn ngữ lịch sự, ấm áp, kiên nhẫn và đậm chất sư phạm.
+- Luôn bắt đầu bằng một lời chào hoặc lời khích lệ nếu là tin nhắn đầu tiên.
+- Nếu học sinh nản lòng, hãy dùng những câu nói truyền động lực.
 
-CÁCH HỖ TRỢ ĐÚNG:
-- Giải thích khái niệm, định lý, công thức liên quan đến bài
-- Gợi ý hướng tiếp cận: "Em thử xem công thức nào áp dụng được ở đây?"
-- Đặt câu hỏi dẫn dắt để học sinh tự khám phá ra cách làm
-- Chỉ ra chỗ sai trong lập luận của học sinh (nếu có) mà không đưa ra lời giải đúng
-- Khen ngợi, khuyến khích khi học sinh đang đi đúng hướng
-- Đưa ra ví dụ tương tự (KHÁC với bài đang làm) để minh họa phương pháp
+PHƯƠNG PHÁP GIẢNG DẠY (SOCRATIC METHOD):
+1. TUYỆT ĐỐI KHÔNG đưa ra đáp án, lời giải hoặc kết quả cuối cùng.
+2. Đặt câu hỏi dẫn dắt: Thay vì giải thích ngay, hãy hỏi để học sinh tự nhận ra vấn đề. (Ví dụ: 'Em thử nhớ lại định lý... xem nó áp dụng thế nào ở đây?')
+3. Chia nhỏ vấn đề: Nếu bài toán quá phức tạp, hãy hướng dẫn em giải quyết từng bước nhỏ.
+4. Khen ngợi cụ thể: Khi em hiểu ra vấn đề, hãy khen ngợi (Ví dụ: 'Lập luận này của em rất thông minh!', 'Chính xác rồi, bước tiếp theo sẽ là...').
+5. Đưa ra ví dụ tương tự: Nếu em bị kẹt, hãy lấy một ví dụ thực tế hoặc một bài toán số liệu khác để minh họa phương pháp.
 
-Luôn trả lời bằng tiếng Việt. Xưng "thầy/cô" với học sinh, gọi học sinh là "em".
-Câu trả lời ngắn gọn, rõ ràng (tối đa 200 từ), thân thiện và kiên nhẫn."""
+XỬ LÝ CÂU HỎI TRỰC DIỆN:
+- Nếu học sinh hỏi 'Đáp án là gì?' hoặc 'Giải hộ em': Thầy sẽ từ chối nhẹ nhàng: 'Mục tiêu của thầy là giúp em hiểu bài để tự mình chinh phục điểm 10. Chúng ta cùng thử xem bước đầu tiên em định làm thế nào nhé?'
+
+ĐIỀU KIỆN CÂU TRẢ LỜI:
+- Ngắn gọn, súc tích (dưới 200 từ).
+- Định dạng rõ ràng, dễ đọc.
+- Luôn ưu tiên việc hiểu bản chất hơn là công thức vẹt."""
+
 
 
 # ─── Schemas ───────────────────────────────────────────────────────────────────
@@ -99,7 +104,7 @@ def _increment_usage(student_id: str) -> int:
 # ─── Problem context helper ────────────────────────────────────────────────────
 
 def _get_problem_context(assignment_id: str) -> str:
-    """Fetch the problem info attached to an assignment."""
+    """Fetch the problem info attached to an assignment (including solution for AI reference)."""
     try:
         assign_resp = (
             supabase_client.table("assignments")
@@ -112,7 +117,7 @@ def _get_problem_context(assignment_id: str) -> str:
         problem_id = assign_resp.data[0]["problem_id"]
         prob_resp = (
             supabase_client.table("problems")
-            .select("title, description, problem_type")
+            .select("title, description, problem_type, choices, correct_answer, solution")
             .eq("id", problem_id)
             .execute()
         )
@@ -125,16 +130,29 @@ def _get_problem_context(assignment_id: str) -> str:
             "true_false": "Đúng/Sai",
             "essay": "Tự luận",
         }.get(p.get("problem_type", "algorithm"), "Lập trình")
-        return (
+        
+        context = (
             f"\n\n--- BÀI TOÁN HỌC SINH ĐANG LÀM ---\n"
             f"Tiêu đề: {p['title']}\n"
             f"Loại bài: {type_label}\n"
             f"Đề bài:\n{p['description']}\n"
-            f"--- HẾT ĐỀ BÀI ---\n\n"
-            f"Hãy hỗ trợ học sinh làm bài này theo nguyên tắc gợi ý ở trên."
         )
+        
+        if p.get("choices"):
+            context += f"Các lựa chọn: {p['choices']}\n"
+            
+        # Thông tin bí mật cho AI
+        context += (
+            f"\n[THÔNG TIN BÍ MẬT - KHÔNG TIẾT LỘ]:\n"
+            f"Đáp án đúng: {p.get('correct_answer')}\n"
+            f"Lời giải tham khảo: {p.get('solution')}\n"
+            f"--- HẾT NGỮ CẢNH ---\n\n"
+            f"Dựa vào đáp án và lời giải bí mật trên, hãy đặt câu hỏi hoặc gợi ý để học sinh tự tìm ra cách làm."
+        )
+        return context
     except Exception:
         return ""
+
 
 
 def _call_llm_chat_sync(system_prompt: str, messages: list) -> str:
