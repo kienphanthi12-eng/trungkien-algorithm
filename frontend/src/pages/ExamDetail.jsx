@@ -3,6 +3,9 @@ import { useAuth } from '../contexts/AuthContext';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { getExam, getStudents, createAssignment, generateExamVariant } from '../services/api';
 import MarkdownRenderer from '../components/MarkdownRenderer';
+import PrintableExam from '../components/PrintableExam';
+import { useReactToPrint } from 'react-to-print';
+import React, { useRef } from 'react';
 import logo from '../assets/logo.png';
 
 const DIFFICULTY_LABELS = { easy: 'Dễ', medium: 'Trung bình', hard: 'Khó' };
@@ -40,6 +43,13 @@ export default function ExamDetail() {
   // Expanded question
   const [expandedIdx, setExpandedIdx] = useState(null);
   const [variantLoading, setVariantLoading] = useState(false);
+
+  // Printing logic
+  const componentRef = useRef();
+  const handlePrint = useReactToPrint({
+    content: () => componentRef.current,
+    documentTitle: exam ? `De_thi_${exam.title}` : 'De_thi',
+  });
 
   useEffect(() => {
     loadExam();
@@ -178,6 +188,12 @@ export default function ExamDetail() {
                     className="hidden sm:flex px-4 py-2.5 bg-white border border-blue-200 text-blue-600 text-sm font-bold rounded-xl hover:bg-blue-50 transition-all items-center gap-2"
                   >
                     ✨ Tạo biến thể AI
+                  </button>
+                  <button
+                    onClick={handlePrint}
+                    className="px-4 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-sm font-bold rounded-xl shadow-lg shadow-blue-200 hover:scale-105 transition-all flex items-center gap-2"
+                  >
+                    🖨️ In đề / PDF
                   </button>
                   <button
                     onClick={openModal}
@@ -440,6 +456,10 @@ export default function ExamDetail() {
           </div>
         </div>
       )}
+      {/* Hidden printable component */}
+      <div style={{ display: 'none' }}>
+        <PrintableExam ref={componentRef} exam={exam} />
+      </div>
     </div>
   );
 }
