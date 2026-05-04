@@ -11,12 +11,13 @@ import {
   getProblem,
   sendChatMessage,
   getChatQuota,
+  updateProblem,
 } from '../services/api';
 import { useNavigate } from 'react-router-dom';
 import MarkdownRenderer from '../components/MarkdownRenderer';
 import FigureRenderer from '../components/FigureRenderer';
 import FigureEditor from '../components/FigureEditor';
-import { updateProblem } from '../services/api';
+
 
 const STATUS_LABEL = {
   pending: { text: 'Chờ nộp', cls: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
