@@ -255,18 +255,51 @@ def analyze_exam_file(
                 if len(fitz_words) > len(words):
                     extracted_text = fitz_text
                     words = fitz_words
+                doc.close()
             except ImportError:
                 print("[ANALYZE] PyMuPDF chưa cài", flush=True)
             except Exception as e:
                 print(f"[ANALYZE] PyMuPDF lỗi: {e}", flush=True)
+
+        # Bước 3: nếu vẫn ít text → PDF là image-based → OCR bằng Tesseract
+        if len(words) < 20:
+            print(f"[ANALYZE] PyMuPDF cũng kém ({len(words)} từ) → thử OCR (Tesseract)...", flush=True)
+            try:
+                import fitz
+                import pytesseract
+                from PIL import Image as _PIL_Image
+
+                doc = fitz.open(stream=raw, filetype="pdf")
+                ocr_pages = []
+                for page in doc:
+                    # Render ở 2x resolution cho OCR chính xác hơn
+                    mat = fitz.Matrix(2.0, 2.0)
+                    pix = page.get_pixmap(matrix=mat, colorspace=fitz.csRGB)
+                    img_bytes = pix.tobytes("png")
+                    img = _PIL_Image.open(_io.BytesIO(img_bytes))
+                    ocr_text = pytesseract.image_to_string(img, lang="vie+eng", config="--psm 3")
+                    if ocr_text.strip():
+                        ocr_pages.append(ocr_text)
+                doc.close()
+
+                ocr_full = "\n\n".join(ocr_pages).strip()
+                ocr_words = _re.findall(r'[a-zA-ZÀ-ỹ\d]{2,}', ocr_full)
+                print(f"[ANALYZE] OCR: {len(ocr_words)} từ, {len(ocr_full)} ký tự", flush=True)
+                if len(ocr_words) > len(words):
+                    extracted_text = ocr_full
+                    words = ocr_words
+            except ImportError as ie:
+                print(f"[ANALYZE] Tesseract/pytesseract chưa cài: {ie}", flush=True)
+            except Exception as e:
+                print(f"[ANALYZE] OCR lỗi: {e}", flush=True)
 
         if len(extracted_text) < 100 or len(words) < 20:
             raise HTTPException(
                 status_code=400,
                 detail=(
                     f"Không đọc được text từ PDF này (đọc được {len(words)} từ). "
-                    f"File có thể là PDF scan/ảnh chụp. "
-                    f"Vui lòng xuất PDF từ Word/Google Docs để có text layer."
+                    f"Vui lòng đảm bảo PDF có text layer (xuất từ Word/Google Docs), "
+                    f"hoặc nếu là file scan thì cần đảm bảo Tesseract OCR đã được cài trên server."
                 ),
             )
 
