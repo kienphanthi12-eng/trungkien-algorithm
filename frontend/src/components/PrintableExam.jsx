@@ -6,6 +6,7 @@ const PrintableExam = React.forwardRef(({ exam }, ref) => {
 
   // Handle both possible key names for questions
   const questions = exam.questions || exam.problems || [];
+  console.log("[PrintableExam] Rendering questions:", questions.length);
 
   return (
     <div ref={ref} className="print-container bg-white p-[2cm] text-black font-serif" style={{ minHeight: '29.7cm' }}>
@@ -14,7 +15,7 @@ const PrintableExam = React.forwardRef(({ exam }, ref) => {
         <div className="text-center w-1/2">
           <p className="font-bold text-sm uppercase">SỞ GIÁO DỤC VÀ ĐÀO TẠO</p>
           <p className="font-bold text-base uppercase border-b border-black inline-block pb-1 mb-2">TRƯỜNG THPT ZENTUS</p>
-          <p className="text-xs italic">(Đề thi có {questions.length} câu hỏi)</p>
+          <p className="text-xs italic">(Đề thi có {questions.length || 0} câu hỏi)</p>
         </div>
         <div className="text-center w-1/2">
           <p className="font-bold text-lg uppercase">KỲ THI KHẢO SÁT CHẤT LƯỢNG</p>

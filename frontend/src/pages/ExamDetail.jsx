@@ -464,10 +464,20 @@ export default function ExamDetail() {
           </div>
         </div>
       )}
-      {/* Hidden printable component */}
-      <div style={{ display: 'none' }}>
+      {/* Hidden printable component using CSS to stay in DOM but invisible */}
+      <div className="hidden-print-source">
         <PrintableExam ref={componentRef} exam={exam} />
       </div>
+
+      <style>{`
+        .hidden-print-source {
+          position: absolute;
+          left: -9999px;
+          top: 0;
+          height: 0;
+          overflow: hidden;
+        }
+      `}</style>
     </div>
   );
 }
