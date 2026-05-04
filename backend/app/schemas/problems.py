@@ -26,6 +26,7 @@ class ProblemBase(BaseModel):
     choices: Optional[Dict[str, str]] = None   # {"A": "...", "B": "...", "C": "...", "D": "..."}
     correct_answer: Optional[str] = None       # "A"/"B"/"C"/"D" or "true"/"false"
     solution: Optional[str] = None             # Lời giải chi tiết
+    figure_json: Optional[Dict[str, Any]] = None # Hình vẽ hình học (SVG/JSON)
 
     @field_validator("test_cases", mode="before")
     @classmethod
@@ -69,6 +70,7 @@ class ProblemUpdate(BaseModel):
     choices: Optional[Dict[str, str]] = None
     correct_answer: Optional[str] = None
     solution: Optional[str] = None
+    figure_json: Optional[Dict[str, Any]] = None
 
 
 class Problem(ProblemBase):

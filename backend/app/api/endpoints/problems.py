@@ -432,31 +432,18 @@ def update_problem(
             )
 
         # Prepare update data
-        update_data = {}
-        if problem_in.title is not None:
-            update_data["title"] = problem_in.title
-        if problem_in.description is not None:
-            update_data["description"] = problem_in.description
-        if problem_in.difficulty is not None:
-            update_data["difficulty"] = problem_in.difficulty
-        if problem_in.category is not None:
-            update_data["category"] = problem_in.category
-        if problem_in.example_input is not None:
-            update_data["example_input"] = problem_in.example_input
-        if problem_in.example_output is not None:
-            update_data["example_output"] = problem_in.example_output
-        if problem_in.test_cases is not None:
+        update_data = problem_in.model_dump(exclude_unset=True)
+        
+        # Handle test_cases specially if provided
+        if "test_cases" in update_data and update_data["test_cases"] is not None:
             update_data["test_cases"] = json.dumps([tc.dict() for tc in problem_in.test_cases])
-        if problem_in.time_limit is not None:
-            update_data["time_limit"] = problem_in.time_limit
-        if problem_in.memory_limit is not None:
-            update_data["memory_limit"] = problem_in.memory_limit
 
         if not update_data:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Không có dữ liệu cần cập nhật."
             )
+
 
         response = supabase_client.table("problems") \
             .update(update_data) \

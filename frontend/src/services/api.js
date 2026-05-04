@@ -396,8 +396,8 @@ export async function assignExamToClass(token, classroomId, examId, dueDate = nu
 }
 
 export async function updateProblem(token, problemId, data) {
-  const response = await _authFetch(`${API_BASE_URL}/exams/problems/${problemId}`, {
-    method: 'PATCH',
+  const response = await _authFetch(`${API_BASE_URL}/problems/${problemId}`, {
+    method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
   }, token);

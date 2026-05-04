@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { getExam, getStudents, createAssignment, generateExamVariant } from '../services/api';
+import { getExam, getStudents, createAssignment, generateExamVariant, updateProblem } from '../services/api';
 import MarkdownRenderer from '../components/MarkdownRenderer';
 import PrintableExam from '../components/PrintableExam';
 import FigureRenderer from '../components/FigureRenderer';
@@ -30,6 +30,7 @@ export default function ExamDetail() {
   const navigate = useNavigate();
 
   const [exam, setExam] = useState(null);
+  const problems = exam?.problems || [];
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
