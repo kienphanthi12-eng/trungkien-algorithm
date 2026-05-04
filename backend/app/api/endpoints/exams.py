@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query, File, Uplo
 from typing import List, Optional, Dict
 from uuid import UUID
 from pydantic import BaseModel
-import uuid, os, json, base64
+import uuid, os, json, base64, asyncio
 from app.services.supabase_client import supabase_client
 from app.api.dependencies import get_current_user, get_current_teacher
 from app.schemas.exams import Exam, ExamCreate, ExamUpdate, ExamList
@@ -160,10 +160,6 @@ async def analyze_exam_file(
 
     try:
         import anthropic
-        # Use AsyncAnthropic — this is an async endpoint (needs await file.read()),
-        # calling the sync client inside an async function blocks the event loop
-        # and causes APIConnectionError. AsyncAnthropic + await is the correct fix.
-        client = anthropic.AsyncAnthropic(api_key=api_key)
 
         encoded = base64.standard_b64encode(raw).decode("utf-8")
 
@@ -187,23 +183,30 @@ async def analyze_exam_file(
                 },
             }
 
-        response = await client.messages.create(
-            model="claude-sonnet-4-6",
-            max_tokens=8000,
-            system=ANALYZE_SYSTEM_PROMPT,
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        file_block,
-                        {
-                            "type": "text",
-                            "text": "Hãy trích xuất tất cả câu hỏi trong tài liệu này và trả về mảng JSON theo định dạng đã yêu cầu.",
-                        },
-                    ],
-                }
-            ],
-        )
+        # Use sync Anthropic client via asyncio.to_thread — avoids event-loop
+        # conflicts (uvloop + httpx async can cause APIConnectionError).
+        # to_thread offloads blocking I/O to a thread pool safely.
+        def _call_claude():
+            client = anthropic.Anthropic(api_key=api_key, timeout=300.0)
+            return client.messages.create(
+                model="claude-sonnet-4-6",
+                max_tokens=8000,
+                system=ANALYZE_SYSTEM_PROMPT,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [
+                            file_block,
+                            {
+                                "type": "text",
+                                "text": "Hãy trích xuất tất cả câu hỏi trong tài liệu này và trả về mảng JSON theo định dạng đã yêu cầu.",
+                            },
+                        ],
+                    }
+                ],
+            )
+
+        response = await asyncio.to_thread(_call_claude)
 
         raw_text = response.content[0].text
         questions = _parse_json_from_llm(raw_text)
