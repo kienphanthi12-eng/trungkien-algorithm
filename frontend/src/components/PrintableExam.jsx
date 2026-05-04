@@ -38,35 +38,37 @@ const PrintableExam = React.forwardRef(({ exam }, ref) => {
 
       {/* Questions Section */}
       <div className="space-y-6">
-        {questions.map((q, idx) => (
-          <div key={idx} className="question-item break-inside-avoid mb-4">
-            <div className="flex gap-2 items-start mb-2">
-              <span className="font-bold shrink-0">Câu {idx + 1}:</span>
-              <div className="prose prose-slate max-w-none print-math">
-                {/* Try both Markdown and fallback raw text if empty */}
-                <MarkdownRenderer content={q.description || q.problem_text || ""} />
-                {!q.description && !q.problem_text && <span className="text-red-500">[Dữ liệu câu hỏi trống]</span>}
+        {questions.map((q, idx) => {
+          const p = q.problem || q;
+          return (
+            <div key={idx} className="question-item break-inside-avoid mb-4">
+              <div className="flex gap-2 items-start mb-2">
+                <span className="font-bold shrink-0">Câu {idx + 1}:</span>
+                <div className="prose prose-slate max-w-none print-math">
+                  <MarkdownRenderer content={p.description || p.problem_text || ""} />
+                  {!p.description && !p.problem_text && <span className="text-red-500">[Dữ liệu câu hỏi trống]</span>}
+                </div>
               </div>
+
+              {p.problem_type === 'multiple_choice' && p.choices && (
+                <div className="grid grid-cols-2 gap-x-8 gap-y-2 ml-8">
+                  {Object.entries(p.choices).map(([key, val]) => (
+                    <div key={key} className="flex gap-2">
+                      <span className="font-bold">{key}.</span>
+                      <MarkdownRenderer content={val} />
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {p.problem_type === 'true_false' && (
+                <div className="ml-8 italic text-sm text-gray-600">
+                  (Chọn Đúng hoặc Sai cho mỗi ý)
+                </div>
+              )}
             </div>
-
-            {q.problem_type === 'multiple_choice' && q.choices && (
-              <div className="grid grid-cols-2 gap-x-8 gap-y-2 ml-8">
-                {Object.entries(q.choices).map(([key, val]) => (
-                  <div key={key} className="flex gap-2">
-                    <span className="font-bold">{key}.</span>
-                    <MarkdownRenderer content={val} />
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {q.problem_type === 'true_false' && (
-              <div className="ml-8 italic text-sm text-gray-600">
-                (Chọn Đúng hoặc Sai cho mỗi ý)
-              </div>
-            )}
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Footer */}
