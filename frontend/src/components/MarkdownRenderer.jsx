@@ -27,12 +27,17 @@ export default function MarkdownRenderer({ content, className = "" }) {
           // Tùy chỉnh các thẻ HTML nếu cần (ví dụ: link mở tab mới)
           a: ({ node, ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline" />,
           table: ({ node, ...props }) => (
-            <div className="overflow-x-auto my-4">
-              <table {...props} className="min-w-full divide-y divide-gray-200 border border-gray-200 rounded-lg" />
+            <div className="overflow-x-auto my-6">
+              <table {...props} className="min-w-full border-collapse border border-slate-300 rounded-lg overflow-hidden shadow-sm" />
             </div>
           ),
-          th: ({ node, ...props }) => <th {...props} className="px-4 py-2 bg-gray-50 font-bold text-left text-sm" />,
-          td: ({ node, ...props }) => <td {...props} className="px-4 py-2 border-t border-gray-100 text-sm" />,
+          thead: ({ node, ...props }) => <thead {...props} className="bg-slate-50" />,
+          th: ({ node, ...props }) => (
+            <th {...props} className="border border-slate-300 px-4 py-2.5 text-left text-sm font-bold text-slate-700 bg-slate-100/50" />
+          ),
+          td: ({ node, ...props }) => (
+            <td {...props} className="border border-slate-300 px-4 py-2 text-sm text-slate-600 bg-white" />
+          ),
         }}
       >
         {processedContent}

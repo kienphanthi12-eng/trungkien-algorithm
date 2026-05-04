@@ -1,3 +1,26 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Custom Table Styles for Math Exams */
+table {
+  border-collapse: collapse;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.prose table thead th {
+  text-align: center;
+  background-color: #f8fafc;
+}
+
+.prose table td {
+  text-align: center;
+}
+
+/* Ensure math formulas don't break layout */
+.katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.5rem 0;
+}
