@@ -380,7 +380,7 @@ export async function addStudentToClass(token, classroomId, studentId) {
 }
 
 export async function removeStudentFromClass(token, classroomId, studentId) {
-  const response = await _authFetch(`${API_BASE_URL}/classrooms/${classroomId}/students/${student_id}`, {
+  const response = await _authFetch(`${API_BASE_URL}/classrooms/${classroomId}/students/${studentId}`, {
     method: 'DELETE', headers: {}
   }, token);
   if (!response.ok) throw new Error(await _parseError(response, 'Lỗi khi xóa học sinh khỏi lớp'));

@@ -34,16 +34,20 @@ export default function ClassroomList() {
 
   const handleCreate = async (e) => {
     e.preventDefault();
+    console.log("[ClassroomList] handleCreate started", { name: newName, desc: newDesc });
     if (!newName.trim()) return;
     setCreating(true);
     try {
-      await createClassroom(token, { name: newName, description: newDesc });
+      console.log("[ClassroomList] Calling createClassroom API...");
+      const result = await createClassroom(token, { name: newName, description: newDesc });
+      console.log("[ClassroomList] createClassroom success:", result);
       setNewName('');
       setNewDesc('');
       setShowModal(false);
       loadClassrooms();
     } catch (err) {
-      alert(err.message);
+      console.error("[ClassroomList] createClassroom error:", err);
+      alert("Lỗi: " + err.message);
     } finally {
       setCreating(false);
     }
