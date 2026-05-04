@@ -156,46 +156,24 @@ def _get_problem_context(assignment_id: str) -> str:
 
 
 def _call_llm_chat_sync(system_prompt: str, messages: list) -> str:
-    """Call DeepSeek (primary) or Anthropic (fallback). Sync, called via asyncio.to_thread."""
+    """Call DeepSeek. Sync, called via asyncio.to_thread."""
     import httpx
-
-    # 1. Try DeepSeek
     api_key = os.environ.get("DEEPSEEK_API_KEY", "")
-    if api_key:
-        try:
-            resp = httpx.post(
-                "https://api.deepseek.com/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "model": "deepseek-chat",
-                    "messages": [{"role": "system", "content": system_prompt}] + messages,
-                    "max_tokens": 600,
-                    "temperature": 0.7,
-                },
-                timeout=30.0,
-            )
-            resp.raise_for_status()
-            return resp.json()["choices"][0]["message"]["content"].strip()
-        except Exception:
-            pass
-
-    # 2. Fallback: Anthropic Claude Haiku
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-    if api_key:
-        import anthropic
-        client = anthropic.Anthropic(api_key=api_key)
-        msg = client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=600,
-            system=system_prompt,
-            messages=messages,
-        )
-        return msg.content[0].text.strip()
-
-    raise ValueError("Chưa cấu hình DEEPSEEK_API_KEY hoặc ANTHROPIC_API_KEY.")
+    if not api_key:
+        raise ValueError("Chưa cấu hình DEEPSEEK_API_KEY.")
+    resp = httpx.post(
+        "https://api.deepseek.com/chat/completions",
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+        json={
+            "model": "deepseek-chat",
+            "messages": [{"role": "system", "content": system_prompt}] + messages,
+            "max_tokens": 600,
+            "temperature": 0.7,
+        },
+        timeout=30.0,
+    )
+    resp.raise_for_status()
+    return resp.json()["choices"][0]["message"]["content"].strip()
 
 
 # ─── Endpoints ─────────────────────────────────────────────────────────────────

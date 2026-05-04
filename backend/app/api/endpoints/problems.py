@@ -183,46 +183,12 @@ def _generate_with_deepseek_sync(prompt: str) -> dict:
     return json.loads(content.strip())
 
 
-def _generate_with_anthropic_sync(prompt: str) -> dict:
-    """Sync call to Anthropic (identical pattern to working grading function)."""
-    import anthropic
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-    if not api_key:
-        raise ValueError("ANTHROPIC_API_KEY not configured")
-    client = anthropic.Anthropic(api_key=api_key)
-    message = client.messages.create(
-        model="claude-haiku-4-5-20251001",
-        max_tokens=2000,
-        system=GENERATE_SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": f"Tạo bài toán về: {prompt}"}],
-    )
-    content = message.content[0].text.strip()
-    if content.startswith("```"):
-        content = content.split("```")[1]
-        if content.startswith("json"):
-            content = content[4:]
-    return json.loads(content.strip())
-
-
 def _call_llm_generator_sync(prompt: str) -> dict:
-    """Try DeepSeek first, fallback to Anthropic. Pure sync like grading."""
-    last_error = None
-
-    if os.environ.get("DEEPSEEK_API_KEY"):
-        try:
-            return _generate_with_deepseek_sync(prompt)
-        except Exception as e:
-            last_error = e
-
-    if os.environ.get("ANTHROPIC_API_KEY"):
-        try:
-            return _generate_with_anthropic_sync(prompt)
-        except Exception as e:
-            last_error = e
-
-    if last_error:
-        raise last_error
-    raise ValueError("Chưa cấu hình API key (DEEPSEEK_API_KEY hoặc ANTHROPIC_API_KEY).")
+    """Generate problem with DeepSeek."""
+    api_key = os.environ.get("DEEPSEEK_API_KEY", "")
+    if not api_key:
+        raise ValueError("Chưa cấu hình DEEPSEEK_API_KEY.")
+    return _generate_with_deepseek_sync(prompt)
 
 
 def _generate_bulk_with_deepseek_sync(prompt: str, count: int) -> List[dict]:

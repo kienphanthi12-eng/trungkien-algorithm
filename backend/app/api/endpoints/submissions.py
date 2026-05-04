@@ -169,64 +169,14 @@ def _grade_with_deepseek(problem_title: str, problem_description: str, answer_te
     return {"score": feedback["score"], "feedback_json": feedback, "llm_cost": llm_cost, "model": "deepseek-chat"}
 
 
-def _grade_with_anthropic(problem_title: str, problem_description: str, answer_text: str,
-                          system_prompt: str = None) -> dict:
-    """Call Anthropic Claude Haiku. Fallback option."""
-    import anthropic
-
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-    if not api_key:
-        raise ValueError("ANTHROPIC_API_KEY not configured")
-
-    client = anthropic.Anthropic(api_key=api_key)
-    user_msg = _build_grading_user_msg(problem_title, problem_description, answer_text)
-
-    message = client.messages.create(
-        model="claude-haiku-4-5-20251001",
-        max_tokens=1024,
-        messages=[{"role": "user", "content": user_msg}],
-        system=system_prompt or GRADING_SYSTEM_PROMPT,
-    )
-
-    response_text = message.content[0].text.strip()
-    feedback = _parse_grading_response(response_text)
-
-    # Haiku pricing: $0.80/MTok input, $4.00/MTok output (claude-haiku-4-5)
-    input_tokens = message.usage.input_tokens
-    output_tokens = message.usage.output_tokens
-    llm_cost = (input_tokens * 0.0000008) + (output_tokens * 0.000004)
-
-    return {"score": feedback["score"], "feedback_json": feedback, "llm_cost": llm_cost, "model": "claude-haiku-4-5"}
-
-
 def _call_llm_grader(problem_title: str, problem_description: str, answer_text: str,
                      system_prompt: str = None) -> dict:
-    """
-    Grade with DeepSeek first (cheaper), fallback to Anthropic.
-    Returns: {"score": float, "feedback_json": dict, "llm_cost": float}
-    """
+    """Grade with DeepSeek. Returns: {"score": float, "feedback_json": dict, "llm_cost": float}"""
     sp = system_prompt or GRADING_SYSTEM_PROMPT
-    last_error = None
-
-    # 1. Try DeepSeek first (cheapest)
-    deepseek_key = os.environ.get("DEEPSEEK_API_KEY", "")
-    if deepseek_key:
-        try:
-            return _grade_with_deepseek(problem_title, problem_description, answer_text, sp)
-        except Exception as e:
-            last_error = e
-
-    # 2. Fallback to Anthropic
-    anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "")
-    if anthropic_key:
-        try:
-            return _grade_with_anthropic(problem_title, problem_description, answer_text, sp)
-        except Exception as e:
-            last_error = e
-
-    # 3. No API keys configured — return placeholder
-    if last_error:
-        raise last_error
+    api_key = os.environ.get("DEEPSEEK_API_KEY", "")
+    if not api_key:
+        raise ValueError("Chưa cấu hình DEEPSEEK_API_KEY.")
+    return _grade_with_deepseek(problem_title, problem_description, answer_text, sp)
 
     return {
         "score": 5.0,

@@ -201,19 +201,19 @@ def analyze_exam_file(
         raise HTTPException(status_code=400, detail="File quá lớn. Tối đa 10 MB.")
 
     # ── Encode & call Claude ─────────────────────────────────────────────
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+    api_key = os.environ.get("DEEPSEEK_API_KEY", "").strip()
     if not api_key:
-        raise HTTPException(status_code=500, detail="ANTHROPIC_API_KEY chưa được cấu hình.")
+        raise HTTPException(status_code=500, detail="DEEPSEEK_API_KEY chưa được cấu hình.")
 
     try:
-        import urllib.request as _urllib_req
+        import httpx
         import io as _io
+        import re as _re
 
-        # ── Strategy: PDF → extract text first (cheap), fallback vision if scan ──
-        user_content = []
+        messages_content = []
 
         if media_type == "application/pdf":
-            # Try to extract text layer with pypdf
+            # Strategy 1: pypdf text extraction (rẻ nhất, không cần vision)
             extracted_text = ""
             pypdf_ok = False
             try:
@@ -228,19 +228,16 @@ def analyze_exam_file(
                 extracted_text = "\n\n".join(pages_text).strip()
                 print(f"[ANALYZE] pypdf OK — {len(reader.pages)} trang, {len(extracted_text)} ký tự", flush=True)
             except ImportError:
-                print("[ANALYZE] ❌ pypdf CHƯA CÀI — fallback Claude Vision", flush=True)
+                print("[ANALYZE] ❌ pypdf chưa cài", flush=True)
             except Exception as e:
-                print(f"[ANALYZE] ❌ pypdf LỖI: {type(e).__name__}: {e} — fallback Claude Vision", flush=True)
+                print(f"[ANALYZE] ❌ pypdf lỗi: {e}", flush=True)
 
-            # Kiểm tra chất lượng text: không chỉ đếm ký tự mà còn đếm từ thực sự
-            # PDF scan thường extract được rất ít text hoặc toàn ký tự rác
-            import re as _re
             words = _re.findall(r'[a-zA-ZÀ-ỹ\d]{2,}', extracted_text)
             text_quality_ok = len(extracted_text) >= 100 and len(words) >= 20
 
             if text_quality_ok:
-                print(f"[ANALYZE] ✅ Strategy: TEXT MODE (pypdf → {len(words)} từ, {len(extracted_text)} ký tự)", flush=True)
-                user_content = [
+                print(f"[ANALYZE] ✅ TEXT MODE — {len(words)} từ, {len(extracted_text)} ký tự", flush=True)
+                messages_content = [
                     {
                         "type": "text",
                         "text": (
@@ -251,51 +248,71 @@ def analyze_exam_file(
                     }
                 ]
             else:
-                reason = "pypdf chưa cài" if not pypdf_ok else f"text kém chất lượng ({len(words)} từ, {len(extracted_text)} ký tự → PDF scan)"
-                print(f"[ANALYZE] ⚠️  Strategy: VISION MODE ({reason})", flush=True)
-                encoded = base64.standard_b64encode(raw).decode("utf-8")
-                user_content = [
-                    {
-                        "type": "document",
-                        "source": {"type": "base64", "media_type": "application/pdf", "data": encoded},
-                    },
-                    {"type": "text", "text": "Hãy trích xuất tất cả câu hỏi trong tài liệu này và trả về mảng JSON theo định dạng đã yêu cầu."},
-                ]
+                # Strategy 2: PDF scan → convert pages to JPEG via PyMuPDF → DeepSeek Vision
+                print(f"[ANALYZE] ⚠️ PDF scan ({len(words)} từ) → PyMuPDF convert to JPEG", flush=True)
+                try:
+                    import fitz  # PyMuPDF
+                    doc = fitz.open(stream=raw, filetype="pdf")
+                    img_parts = []
+                    for page_num in range(min(len(doc), 5)):  # tối đa 5 trang
+                        page = doc[page_num]
+                        pix = page.get_pixmap(dpi=150)
+                        jpeg_bytes = pix.tobytes("jpeg")
+                        b64 = base64.standard_b64encode(jpeg_bytes).decode("utf-8")
+                        img_parts.append({
+                            "type": "image_url",
+                            "image_url": {"url": f"data:image/jpeg;base64,{b64}"},
+                        })
+                    img_parts.append({
+                        "type": "text",
+                        "text": "Hãy trích xuất tất cả câu hỏi trong đề thi và trả về mảng JSON theo định dạng đã yêu cầu.",
+                    })
+                    messages_content = img_parts
+                    print(f"[ANALYZE] 🖼️ VISION MODE — {min(len(doc), 5)}/{len(doc)} trang", flush=True)
+                except ImportError:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="PDF này là file scan (không có text). Vui lòng tải lên file ảnh (JPEG/PNG) thay thế.",
+                    )
+                except HTTPException:
+                    raise
+                except Exception as e:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Không thể xử lý PDF scan: {str(e)}. Vui lòng thử tải lên file ảnh.",
+                    )
         else:
-            # Ảnh → Claude Vision
-            print(f"[ANALYZE] 🖼️  Strategy: IMAGE VISION MODE ({media_type})", flush=True)
+            # Ảnh → DeepSeek Vision (image_url format)
+            print(f"[ANALYZE] 🖼️ IMAGE VISION MODE ({media_type})", flush=True)
             encoded = base64.standard_b64encode(raw).decode("utf-8")
-            user_content = [
+            messages_content = [
                 {
-                    "type": "image",
-                    "source": {"type": "base64", "media_type": media_type, "data": encoded},
+                    "type": "image_url",
+                    "image_url": {"url": f"data:{media_type};base64,{encoded}"},
                 },
-                {"type": "text", "text": "Hãy trích xuất tất cả câu hỏi trong tài liệu này và trả về mảng JSON theo định dạng đã yêu cầu."},
+                {
+                    "type": "text",
+                    "text": "Hãy trích xuất tất cả câu hỏi trong đề thi và trả về mảng JSON theo định dạng đã yêu cầu.",
+                },
             ]
 
-        # ── Call Claude via stdlib urllib ─────────────────────────────────
-        payload_bytes = json.dumps({
-            "model": "claude-haiku-4-5-20251001",
-            "max_tokens": 8000,
-            "system": ANALYZE_SYSTEM_PROMPT,
-            "messages": [{"role": "user", "content": user_content}],
-        }).encode("utf-8")
-
-        _req = _urllib_req.Request(
-            "https://api.anthropic.com/v1/messages",
-            data=payload_bytes,
-            headers={
-                "x-api-key": api_key,
-                "anthropic-version": "2023-06-01",
-                "content-type": "application/json",
-                "anthropic-beta": "pdfs-2024-09-25",
+        # ── Call DeepSeek API (OpenAI-compatible) ─────────────────────────
+        resp = httpx.post(
+            "https://api.deepseek.com/chat/completions",
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            json={
+                "model": "deepseek-chat",
+                "max_tokens": 8000,
+                "temperature": 0.1,
+                "messages": [
+                    {"role": "system", "content": ANALYZE_SYSTEM_PROMPT},
+                    {"role": "user", "content": messages_content},
+                ],
             },
-            method="POST",
+            timeout=300.0,
         )
-        with _urllib_req.urlopen(_req, timeout=300) as _resp:
-            _result = json.loads(_resp.read().decode("utf-8"))
-
-        raw_text = _result["content"][0]["text"]
+        resp.raise_for_status()
+        raw_text = resp.json()["choices"][0]["message"]["content"].strip()
         questions = _parse_json_from_llm(raw_text)
 
         # Normalise fields
@@ -322,13 +339,6 @@ def analyze_exam_file(
     except HTTPException:
         raise
     except Exception as e:
-        import urllib.error as _urllib_err
-        if isinstance(e, _urllib_err.HTTPError):
-            body = e.read().decode("utf-8", errors="replace")
-            raise HTTPException(
-                status_code=500,
-                detail=f"Anthropic API lỗi {e.code}: {body[:500]}",
-            )
         raise HTTPException(
             status_code=500,
             detail=f"Lỗi khi phân tích đề thi: {type(e).__name__}: {str(e)}",
@@ -534,60 +544,30 @@ def generate_exam_variant(
                 "category": p.get("category"),
             })
 
-    # 3. Call AI (DeepSeek preferred)
-    ds_key = os.environ.get("DEEPSEEK_API_KEY", "").strip()
-    api_key = ds_key or os.environ.get("ANTHROPIC_API_KEY", "").strip()
-    
+    # 3. Call DeepSeek AI
+    api_key = os.environ.get("DEEPSEEK_API_KEY", "").strip()
     if not api_key:
-        raise HTTPException(status_code=500, detail="Chưa cấu hình DEEPSEEK_API_KEY hoặc ANTHROPIC_API_KEY.")
+        raise HTTPException(status_code=500, detail="Chưa cấu hình DEEPSEEK_API_KEY.")
 
     try:
-        import urllib.request as _urllib_req
-        
-        if ds_key:
-            # --- DeepSeek Logic ---
-            print("[VARIANT] Using DeepSeek V3...", flush=True)
-            url = "https://api.deepseek.com/chat/completions"
-            payload = {
+        import httpx
+        print("[VARIANT] Using DeepSeek...", flush=True)
+        resp = httpx.post(
+            "https://api.deepseek.com/chat/completions",
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            json={
                 "model": "deepseek-chat",
                 "messages": [
                     {"role": "system", "content": VARIANT_SYSTEM_PROMPT},
-                    {"role": "user", "content": f"Hãy tạo biến thể cho bộ đề sau đây:\n\n{json.dumps(source_questions, ensure_ascii=False)}"}
+                    {"role": "user", "content": f"Hãy tạo biến thể cho bộ đề sau đây:\n\n{json.dumps(source_questions, ensure_ascii=False)}"},
                 ],
                 "temperature": 0.7,
-                "response_format": {"type": "json_object"} if "deepseek" in url else None
-            }
-            headers = {
-                "Authorization": f"Bearer {ds_key}",
-                "Content-Type": "application/json"
-            }
-        else:
-            # --- Anthropic Fallback ---
-            print("[VARIANT] Falling back to Anthropic (Sonnet 3.5)...", flush=True)
-            url = "https://api.anthropic.com/v1/messages"
-            payload = {
-                "model": "claude-sonnet-4-6",
                 "max_tokens": 8000,
-                "system": VARIANT_SYSTEM_PROMPT,
-                "messages": [{"role": "user", "content": f"Hãy tạo biến thể cho bộ đề sau đây:\n\n{json.dumps(source_questions, ensure_ascii=False)}"}],
-            }
-            headers = {
-                "x-api-key": api_key,
-                "anthropic-version": "2023-06-01",
-                "content-type": "application/json",
-            }
-
-        payload_bytes = json.dumps(payload).encode("utf-8")
-        _req = _urllib_req.Request(url, data=payload_bytes, headers=headers, method="POST")
-        
-        with _urllib_req.urlopen(_req, timeout=300) as _resp:
-            _result = json.loads(_resp.read().decode("utf-8"))
-
-        if ds_key:
-            raw_text = _result["choices"][0]["message"]["content"]
-        else:
-            raw_text = _result["content"][0]["text"]
-            
+            },
+            timeout=300.0,
+        )
+        resp.raise_for_status()
+        raw_text = resp.json()["choices"][0]["message"]["content"]
         new_questions_data = _parse_json_from_llm(raw_text)
 
 
@@ -601,12 +581,9 @@ def generate_exam_variant(
 
         return create_exam_from_questions(new_exam_data, current_user)
 
+    except HTTPException:
+        raise
     except Exception as e:
-        import urllib.error as _urllib_err
-        if isinstance(e, _urllib_err.HTTPError):
-            body = e.read().decode("utf-8", errors="replace")
-            print(f"[VARIANT] ❌ API Error {e.code}: {body}", flush=True)
-            raise HTTPException(status_code=500, detail=f"Lỗi AI ({e.code}): {body[:200]}")
         raise HTTPException(status_code=500, detail=f"Lỗi khi tạo biến thể AI: {str(e)}")
 
 
