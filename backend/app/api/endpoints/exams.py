@@ -32,7 +32,7 @@ QUY TẮC:
 - Nếu Đúng/Sai → problem_type = "true_false"
 - Còn lại → problem_type = "essay"
 - Giữ nguyên ký tự đặc biệt, công thức toán học trong description
-- Nếu không nhận diện được câu hỏi nào → trả về []"
+- Nếu không nhận diện được câu hỏi nào → trả về []"""
 
 
 VARIANT_SYSTEM_PROMPT = """Bạn là chuyên gia biên soạn đề thi. Nhiệm vụ của bạn là tạo ra một 'biến thể' (Variant) của bộ đề thi được cung cấp.
@@ -58,7 +58,7 @@ YÊU CẦU:
   "solution": "Lời giải chi tiết cho câu hỏi mới này"
 }
 
-QUY TẮC: Trả về DUY NHẤT một mảng JSON hợp lệ, KHÔNG có text nào khác."""""
+QUY TẮC: Trả về DUY NHẤT một mảng JSON hợp lệ, KHÔNG có text nào khác."""
 
 
 # ─── Schemas for create-from-questions ──────────────────────────────────────────
