@@ -265,7 +265,7 @@ def analyze_exam_file(
 
         # ── Call Claude via stdlib urllib ─────────────────────────────────
         payload_bytes = json.dumps({
-            "model": "claude-haiku-4-5-20251001",
+            "model": "claude-3-5-haiku-latest",
             "max_tokens": 8000,
             "system": ANALYZE_SYSTEM_PROMPT,
             "messages": [{"role": "user", "content": user_content}],
@@ -532,7 +532,7 @@ def generate_exam_variant(
     try:
         import urllib.request as _urllib_req
         payload_bytes = json.dumps({
-            "model": "claude-3-5-sonnet-20241022", # Sử dụng Sonnet cho chất lượng cao hơn khi soạn đề
+            "model": "claude-3-5-sonnet-latest",
             "max_tokens": 8000,
             "system": VARIANT_SYSTEM_PROMPT,
             "messages": [{"role": "user", "content": f"Hãy tạo biến thể cho bộ đề sau đây:\n\n{json.dumps(source_questions, ensure_ascii=False)}"}],
@@ -565,6 +565,11 @@ def generate_exam_variant(
         return create_exam_from_questions(new_exam_data, current_user)
 
     except Exception as e:
+        import urllib.error as _urllib_err
+        if isinstance(e, _urllib_err.HTTPError):
+            body = e.read().decode("utf-8", errors="replace")
+            print(f"[VARIANT] ❌ API Error {e.code}: {body}", flush=True)
+            raise HTTPException(status_code=500, detail=f"Lỗi AI ({e.code}): {body[:200]}")
         raise HTTPException(status_code=500, detail=f"Lỗi khi tạo biến thể AI: {str(e)}")
 
 
