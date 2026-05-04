@@ -404,6 +404,7 @@ def analyze_exam_file(
                 "difficulty": q.get("difficulty", "medium"),
                 "category": q.get("category", "Tổng hợp"),
                 "solution": q.get("solution"),
+                "figure_json": q.get("figure_json"),
             })
 
         return {"questions": normalised, "count": len(normalised)}
@@ -449,6 +450,7 @@ def create_exam_from_questions(
                 "choices": q.choices,
                 "correct_answer": q.correct_answer,
                 "solution": q.solution,
+                "figure_json": q.figure_json,
                 "example_input": "",
                 "example_output": "",
                 "test_cases": [],
