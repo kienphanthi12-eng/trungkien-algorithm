@@ -181,6 +181,12 @@ export default function Exams() {
                   </div>
 
                   <div className="flex gap-2">
+                    <Link
+                      to={`/exams/${exam.id}`}
+                      className="flex-1 py-2.5 bg-slate-100 text-slate-700 text-center text-sm font-bold rounded-xl hover:bg-slate-200 transition-colors"
+                    >
+                      Xem chi tiết
+                    </Link>
                     <button
                       onClick={() => openAssignModal(exam)}
                       className="flex-1 py-2.5 bg-slate-900 text-white text-center text-sm font-bold rounded-xl hover:bg-slate-800 transition-colors"
