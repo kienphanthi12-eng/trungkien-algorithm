@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query, File, Uplo
 from typing import List, Optional, Dict
 from uuid import UUID
 from pydantic import BaseModel
-import uuid, os, json, base64, asyncio
+import uuid, os, json, base64
 from app.services.supabase_client import supabase_client
 from app.api.dependencies import get_current_user, get_current_teacher
 from app.schemas.exams import Exam, ExamCreate, ExamUpdate, ExamList
@@ -124,14 +124,18 @@ def health_check():
 # to prevent FastAPI routing them as UUID path params.
 
 @router.post("/analyze")
-async def analyze_exam_file(
+def analyze_exam_file(
     file: UploadFile = File(...),
     current_user=Depends(get_current_teacher),
 ):
     """
     Upload a PDF or image of an exam.
     Claude Vision extracts all questions and returns them as structured JSON.
+    Uses sync def (same pattern as grade_submission) to avoid uvloop/httpx
+    APIConnectionError that occurs when using async def with Anthropic SDK.
     """
+    import anthropic
+
     # ── Validate file type ───────────────────────────────────────────────
     content_type = (file.content_type or "").lower()
     allowed = {
@@ -148,8 +152,8 @@ async def analyze_exam_file(
             detail="Chỉ hỗ trợ PDF, JPEG, PNG, WEBP. Vui lòng chọn đúng định dạng.",
         )
 
-    # ── Read & validate size (max 10 MB) ────────────────────────────────
-    raw = await file.read()
+    # ── Read via sync interface (file.file is SpooledTemporaryFile) ──────
+    raw = file.file.read()
     if len(raw) > 10 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="File quá lớn. Tối đa 10 MB.")
 
@@ -159,8 +163,6 @@ async def analyze_exam_file(
         raise HTTPException(status_code=500, detail="ANTHROPIC_API_KEY chưa được cấu hình.")
 
     try:
-        import anthropic
-
         encoded = base64.standard_b64encode(raw).decode("utf-8")
 
         # Build content block depending on type
@@ -183,30 +185,25 @@ async def analyze_exam_file(
                 },
             }
 
-        # Use sync Anthropic client via asyncio.to_thread — avoids event-loop
-        # conflicts (uvloop + httpx async can cause APIConnectionError).
-        # to_thread offloads blocking I/O to a thread pool safely.
-        def _call_claude():
-            client = anthropic.Anthropic(api_key=api_key, timeout=300.0)
-            return client.messages.create(
-                model="claude-sonnet-4-6",
-                max_tokens=8000,
-                system=ANALYZE_SYSTEM_PROMPT,
-                messages=[
-                    {
-                        "role": "user",
-                        "content": [
-                            file_block,
-                            {
-                                "type": "text",
-                                "text": "Hãy trích xuất tất cả câu hỏi trong tài liệu này và trả về mảng JSON theo định dạng đã yêu cầu.",
-                            },
-                        ],
-                    }
-                ],
-            )
-
-        response = await asyncio.to_thread(_call_claude)
+        # Sync client — same pattern as grade_submission which works on Railway
+        client = anthropic.Anthropic(api_key=api_key, timeout=300.0)
+        response = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=8000,
+            system=ANALYZE_SYSTEM_PROMPT,
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        file_block,
+                        {
+                            "type": "text",
+                            "text": "Hãy trích xuất tất cả câu hỏi trong tài liệu này và trả về mảng JSON theo định dạng đã yêu cầu.",
+                        },
+                    ],
+                }
+            ],
+        )
 
         raw_text = response.content[0].text
         questions = _parse_json_from_llm(raw_text)
