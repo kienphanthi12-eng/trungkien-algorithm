@@ -16,7 +16,12 @@ def get_classrooms(
 ):
     """Lấy danh sách lớp học. Nếu là giáo viên thì lấy lớp mình dạy, học sinh thì lấy lớp mình tham gia."""
     try:
-        if current_user.role == 'teacher':
+        # User metadata contains the role
+        user_role = current_user.user_metadata.get("role", "student")
+        print(f"[Debug] User: {current_user.email}, Detected Role: {user_role}")
+        
+        if user_role == 'teacher':
+
             # Get teacher's classrooms - Simplified query
             print(f"[Debug] Fetching classrooms for teacher_id: {current_user.id}")
             resp = supabase_client.table("classrooms")\
