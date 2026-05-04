@@ -43,7 +43,9 @@ const PrintableExam = React.forwardRef(({ exam }, ref) => {
             <div className="flex gap-2 items-start mb-2">
               <span className="font-bold shrink-0">Câu {idx + 1}:</span>
               <div className="prose prose-slate max-w-none print-math">
-                <MarkdownRenderer content={q.description} />
+                {/* Try both Markdown and fallback raw text if empty */}
+                <MarkdownRenderer content={q.description || q.problem_text || ""} />
+                {!q.description && !q.problem_text && <span className="text-red-500">[Dữ liệu câu hỏi trống]</span>}
               </div>
             </div>
 

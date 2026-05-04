@@ -55,7 +55,11 @@ export default function ExamDetail() {
 
   // Manual wrapper to log click
   const onPrintClick = () => {
-    console.log("[Print] Nút in đã được nhấn");
+    console.log("[Print] Nút in đã được nhấn. Dữ liệu đề thi hiện tại:", exam);
+    if (exam) {
+      console.log("[Print] Danh sách câu hỏi (problems):", exam.problems?.length);
+      console.log("[Print] Danh sách câu hỏi (questions):", exam.questions?.length);
+    }
     handlePrint();
   };
 
