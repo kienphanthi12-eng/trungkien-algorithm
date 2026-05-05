@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
-import { analyzeExam, createExamFromQuestions } from '../services/api';
+import { analyzeExam, createExamFromQuestions, generateFigurePreview } from '../services/api';
 import MarkdownRenderer from '../components/MarkdownRenderer';
 import logo from '../assets/logo.png';
 
@@ -37,6 +37,7 @@ export default function AnalyzeExam() {
 
   const [createError, setCreateError] = useState('');
   const [createdExam, setCreatedExam] = useState(null);
+  const [generatingFigureIdx, setGeneratingFigureIdx] = useState(null); // index of question generating figure
 
   // ── File handling ──────────────────────────────────────────────────────────
 
@@ -87,6 +88,32 @@ export default function AnalyzeExam() {
     ));
   };
 
+  // Handler: sinh hình vẽ AI cho câu hỏi cưa chưa lưu
+  const handleGenerateFigure = async (idx) => {
+    const q = questions[idx];
+    if (!q?.description) return;
+    setGeneratingFigureIdx(idx);
+    try {
+      const res = await generateFigurePreview(token, q.description);
+      updateQuestion(idx, 'figure_image', res.figure_image);
+    } catch (err) {
+      alert('Lỗi sinh hình: ' + err.message);
+    } finally {
+      setGeneratingFigureIdx(null);
+    }
+  };
+
+  // Handler: thay ảnh bằng file upload
+  const handleFigureFileChange = (idx, file) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => updateQuestion(idx, 'figure_image', e.target.result);
+    reader.readAsDataURL(file);
+  };
+
+  // Handler: xóa hình
+  const handleRemoveFigure = (idx) => updateQuestion(idx, 'figure_image', null);
+
   const removeQuestion = (idx) => {
     setQuestions(prev => prev.filter((_, i) => i !== idx));
     if (expandedIdx === idx) setExpandedIdx(null);
@@ -104,6 +131,7 @@ export default function AnalyzeExam() {
       difficulty: 'medium',
       category: 'Tổng hợp',
       solution: null,
+      figure_image: null,
     };
     setQuestions(prev => [...prev, newQ]);
     setExpandedIdx(questions.length);
@@ -202,11 +230,11 @@ export default function AnalyzeExam() {
           <div className="bg-white/70 backdrop-blur-xl rounded-3xl border border-white/40 shadow-xl p-10">
             <h2 className="text-2xl font-black text-slate-900 mb-2">Tải lên đề thi</h2>
             <p className="text-slate-500 mb-8">
-              Chỉ hỗ trợ <strong>PDF digital</strong> (xuất từ Word/Google Docs). Tối đa 10 MB.<br />
-              DeepSeek AI sẽ trích xuất toàn bộ câu hỏi từ nội dung text của PDF.
+              Hỗ trợ <strong>PDF digital</strong> (xuất từ Word/Google Docs) hoặc <strong>ảnh chụp</strong> (JPG/PNG) — Tối đa 10 MB.<br />
+              Gemini Vision sẽ tự động nhận diện hình vẽ, biểu đồ và trích xuất câu hỏi.
             </p>
-            <div className="mb-6 p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-700 text-xs">
-              ⚠️ <strong>Lưu ý:</strong> Không hỗ trợ PDF scan (ảnh chụp). Nếu đề thi là file scan, hãy dùng phần mềm OCR chuyển thành PDF có text trước.
+            <div className="mb-6 p-3 bg-blue-50 border border-blue-200 rounded-xl text-blue-700 text-xs">
+              ℹ️ <strong>Phát hiện thông minh:</strong> Nếu PDF có hình vẽ, hệ thống tự dùng Gemini Vision để giữ nguyên ảnh minh hoạ.
             </div>
 
             {/* Drop zone */}
@@ -221,13 +249,13 @@ export default function AnalyzeExam() {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".pdf"
+                accept=".pdf,image/*"
                 className="hidden"
                 onChange={handleFileSelect}
               />
               {file ? (
                 <div>
-                  <div className="text-4xl mb-3">📄</div>
+                  <div className="text-4xl mb-3">{file.type.startsWith('image/') ? '🖼️' : '📄'}</div>
                   <p className="font-bold text-slate-800 text-lg">{file.name}</p>
                   <p className="text-slate-400 text-sm mt-1">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
                   <button
@@ -242,7 +270,7 @@ export default function AnalyzeExam() {
                   <div className="text-5xl mb-4">☁️</div>
                   <p className="font-bold text-slate-600 text-lg">Kéo thả file vào đây</p>
                   <p className="text-slate-400 text-sm mt-1">hoặc click để chọn file</p>
-                  <p className="text-slate-300 text-xs mt-3">PDF digital — tối đa 10 MB</p>
+                  <p className="text-slate-300 text-xs mt-3">PDF digital, JPG, PNG — tối đa 10 MB</p>
                 </div>
               )}
             </div>
@@ -437,6 +465,58 @@ export default function AnalyzeExam() {
                                 <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Xem trước (Preview):</p>
                                 <MarkdownRenderer content={q.description} />
                               </div>
+                            )}
+                          </div>
+
+                          {/* Hình minh hoạ — hiển thị, sinh AI, thay file */}
+                          <div className="border border-slate-200 rounded-xl p-4 bg-white">
+                            <div className="flex items-center justify-between mb-2">
+                              <label className="text-xs font-bold text-slate-600">Hình minh hoạ</label>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => handleGenerateFigure(idx)}
+                                  disabled={generatingFigureIdx === idx || !q.description}
+                                  className="px-3 py-1.5 bg-purple-600 text-white text-xs font-bold rounded-lg hover:bg-purple-700 disabled:opacity-50 transition-colors flex items-center gap-1"
+                                >
+                                  {generatingFigureIdx === idx ? (
+                                    <>
+                                      <svg className="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                      </svg>
+                                      Đang sinh hình…
+                                    </>
+                                  ) : '🎨 Sinh hình AI'}
+                                </button>
+                                <label className="px-3 py-1.5 bg-slate-100 text-slate-600 text-xs font-bold rounded-lg hover:bg-slate-200 cursor-pointer transition-colors">
+                                  📎 Thay ảnh
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={e => { if (e.target.files[0]) handleFigureFileChange(idx, e.target.files[0]); }}
+                                  />
+                                </label>
+                                {q.figure_image && (
+                                  <button
+                                    onClick={() => handleRemoveFigure(idx)}
+                                    className="px-3 py-1.5 bg-red-50 text-red-500 text-xs font-bold rounded-lg hover:bg-red-100 transition-colors"
+                                  >
+                                    🗑 Xóa
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                            {q.figure_image ? (
+                              <img
+                                src={q.figure_image}
+                                alt="Hình minh hoạ"
+                                className="max-w-full h-auto rounded-lg border border-slate-100 shadow-sm"
+                              />
+                            ) : (
+                              <p className="text-xs text-slate-400 text-center py-4">
+                                Chưa có hình minh hoạ. Nhấn "🎨 Sinh hình AI" để AI tự vẽ, hoặc "📎 Thay ảnh" để tải lên.
+                              </p>
                             )}
                           </div>
 

@@ -189,6 +189,17 @@ export async function generateProblemFigure(token, problemId) {
   return response.json(); // { figure_image: "base64..." }
 }
 
+// Sinh hình vẽ AI preview (không lưu DB) — dùng trong AnalyzeExam
+export async function generateFigurePreview(token, description) {
+  const response = await _authFetch(`${API_BASE_URL}/problems/generate-figure-preview`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ description }),
+  }, token);
+  if (!response.ok) { const e = await response.json(); throw new Error(e.detail || 'Lỗi khi sinh hình vẽ preview'); }
+  return response.json(); // { figure_image: "base64..." }
+}
+
 // Helper: parse error detail safely
 async function _parseError(response, fallback) {
   try {
