@@ -172,7 +172,7 @@ export default function Assignments() {
                               to={`/assignments/${assignment.id}`}
                               className="text-base font-medium text-blue-600 hover:text-blue-800"
                             >
-                              {assignment.problem_title || 'Bài toán không xác định'}
+                              {assignment.exam_title || assignment.problem_title || 'Bài tập không xác định'}
                             </Link>
                             <div className="mt-1 flex flex-wrap gap-3 text-sm text-gray-600">
                               {user?.role === 'teacher' && (

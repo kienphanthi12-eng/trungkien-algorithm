@@ -9,6 +9,7 @@ import {
   getSubmissionByAssignment,
   gradeSubmission,
   getProblem,
+  getExam,
   sendChatMessage,
   getChatQuota,
   updateProblem,
@@ -47,6 +48,7 @@ export default function AssignmentDetail() {
 
   const [assignment, setAssignment] = useState(null);
   const [problem, setProblem] = useState(null);
+  const [exam, setExam] = useState(null);
   const [submission, setSubmission] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -83,11 +85,16 @@ export default function AssignmentDetail() {
       if (assignData.status === 'fulfilled') {
         const assign = assignData.value;
         setAssignment(assign);
-        // Load problem details to know problem_type and choices
+        // Load problem hoặc exam details
         if (assign.problem_id) {
           try {
             const prob = await getProblem(token, assign.problem_id);
             setProblem(prob);
+          } catch {}
+        } else if (assign.exam_id) {
+          try {
+            const ex = await getExam(token, assign.exam_id);
+            setExam(ex);
           } catch {}
         }
       } else setError(assignData.reason.message);
@@ -306,19 +313,31 @@ export default function AssignmentDetail() {
             </div>
 
             <div className="px-6 py-5 space-y-4">
-              {/* Problem info */}
+              {/* Problem / Exam info */}
               <div className="bg-gray-50 rounded-lg p-4">
-                <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Bài toán</h2>
-                <div className="flex items-center justify-between">
+                <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                  {assignment.exam_id ? 'Đề thi' : 'Bài toán'}
+                </h2>
+                <div className="flex items-center justify-between gap-3">
                   <span className="text-base font-medium text-gray-900">
-                    {assignment.problem_title || 'Bài toán không xác định'}
+                    {assignment.exam_title || assignment.problem_title || 'Không xác định'}
                   </span>
-                  <Link
-                    to={`/problems/${assignment.problem_id}`}
-                    className="text-blue-600 hover:text-blue-800 text-sm font-medium px-3 py-1 rounded border border-blue-200 hover:bg-blue-50 transition-colors"
-                  >
-                    Xem bài toán →
-                  </Link>
+                  {assignment.problem_id && (
+                    <Link
+                      to={`/problems/${assignment.problem_id}`}
+                      className="shrink-0 text-blue-600 hover:text-blue-800 text-sm font-medium px-3 py-1 rounded border border-blue-200 hover:bg-blue-50 transition-colors"
+                    >
+                      Xem bài toán →
+                    </Link>
+                  )}
+                  {assignment.exam_id && (
+                    <Link
+                      to={`/exams/${assignment.exam_id}`}
+                      className="shrink-0 text-blue-600 hover:text-blue-800 text-sm font-medium px-3 py-1 rounded border border-blue-200 hover:bg-blue-50 transition-colors"
+                    >
+                      Xem đề thi →
+                    </Link>
+                  )}
                 </div>
               </div>
 
@@ -373,6 +392,31 @@ export default function AssignmentDetail() {
                       ✏️ {(problem.figure_json || problem.figure_image) ? 'Sửa hình vẽ' : 'Thêm hình vẽ'}
                     </button>
                   )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Nội dung đề thi (exam assignment) ── */}
+          {exam && (
+            <div className="bg-white shadow rounded-lg overflow-hidden mb-6 p-6">
+              <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Đề thi</h2>
+              {exam.description && (
+                <p className="text-gray-700 text-sm mb-4">{exam.description}</p>
+              )}
+              {exam.questions?.length > 0 && (
+                <div className="space-y-6">
+                  {exam.questions.map((q, idx) => (
+                    <div key={q.id || idx} className="border border-gray-200 rounded-lg p-4">
+                      <p className="text-xs font-semibold text-gray-400 mb-2">Câu {idx + 1}</p>
+                      <ExamProblemView
+                        problem={q}
+                        mode="view"
+                        userRole={user?.role}
+                        showCorrect={user?.role === 'teacher'}
+                      />
+                    </div>
+                  ))}
                 </div>
               )}
             </div>

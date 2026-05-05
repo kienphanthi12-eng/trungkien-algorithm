@@ -187,12 +187,14 @@ export default function Exams() {
                     >
                       Xem chi tiết
                     </Link>
+                    {user?.role === 'teacher' && (
                     <button
                       onClick={() => openAssignModal(exam)}
                       className="flex-1 py-2.5 bg-slate-900 text-white text-center text-sm font-bold rounded-xl hover:bg-slate-800 transition-colors"
                     >
                       Giao bài
                     </button>
+                    )}
                     {user?.role === 'teacher' && (
                       <button onClick={() => handleDelete(exam.id)} className="p-2.5 bg-red-50 text-red-600 rounded-xl hover:bg-red-500 hover:text-white transition-all border border-red-100">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
