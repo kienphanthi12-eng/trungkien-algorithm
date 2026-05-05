@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import logo from '../assets/logo.png';
-import { getProblem, getStudents, createAssignment, updateProblem } from '../services/api';
+import { getProblem, getStudents, createAssignment, updateProblem, generateProblemFigure } from '../services/api';
 import MarkdownRenderer from '../components/MarkdownRenderer';
 import FigureRenderer from '../components/FigureRenderer';
 import FigureEditor from '../components/FigureEditor';
@@ -26,6 +26,8 @@ export default function ProblemDetail() {
   const [assignError, setAssignError] = useState('');
   const [assignSuccess, setAssignSuccess] = useState(false);
   const [editingFigure, setEditingFigure] = useState(false);
+  const [generatingFigure, setGeneratingFigure] = useState(false);
+  const [figureError, setFigureError] = useState('');
 
   useEffect(() => {
     fetchProblem();
@@ -91,6 +93,19 @@ export default function ProblemDetail() {
       alert("Đã cập nhật hình vẽ!");
     } catch (err) {
       alert("Lỗi: " + err.message);
+    }
+  };
+
+  const handleGenerateFigure = async () => {
+    setGeneratingFigure(true);
+    setFigureError('');
+    try {
+      const result = await generateProblemFigure(token, problemId);
+      setProblem(prev => ({ ...prev, figure_image: result.figure_image }));
+    } catch (err) {
+      setFigureError(err.message);
+    } finally {
+      setGeneratingFigure(false);
     }
   };
 
@@ -218,22 +233,35 @@ export default function ProblemDetail() {
               )}
               {!problem.figure_image && problem.figure_json && <FigureRenderer data={problem.figure_json} />}
 
-              {/* Figure Editor for Teacher */}
+              {/* Figure tools for Teacher */}
               {user?.role === 'teacher' && (
-                <div className="mt-4">
-                  {editingFigure ? (
-                    <FigureEditor 
+                <div className="mt-4 space-y-2">
+                  {figureError && (
+                    <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{figureError}</p>
+                  )}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      onClick={handleGenerateFigure}
+                      disabled={generatingFigure}
+                      className="text-xs flex items-center gap-1 text-violet-700 hover:text-violet-900 font-medium py-1.5 px-3 rounded-lg bg-violet-50 border border-violet-200 disabled:opacity-50"
+                    >
+                      {generatingFigure ? '⏳ Đang sinh hình...' : '✨ Sinh hình AI'}
+                    </button>
+                    {!editingFigure && (
+                      <button
+                        onClick={() => setEditingFigure(true)}
+                        className="text-xs flex items-center gap-1 text-blue-600 hover:text-blue-800 font-medium py-1.5 px-3 rounded-lg bg-blue-50 border border-blue-100"
+                      >
+                        ✏️ {(problem.figure_json || problem.figure_image) ? 'Sửa hình JSON' : 'Thêm hình JSON'}
+                      </button>
+                    )}
+                  </div>
+                  {editingFigure && (
+                    <FigureEditor
                       initialData={problem.figure_json}
                       onSave={handleUpdateFigure}
                       onCancel={() => setEditingFigure(false)}
                     />
-                  ) : (
-                    <button 
-                      onClick={() => setEditingFigure(true)}
-                      className="text-xs flex items-center gap-1 text-blue-600 hover:text-blue-800 font-medium py-1.5 px-3 rounded-lg bg-blue-50 border border-blue-100"
-                    >
-                      ✏️ {(problem.figure_json || problem.figure_image) ? 'Sửa hình vẽ' : 'Thêm hình vẽ'}
-                    </button>
                   )}
                 </div>
               )}

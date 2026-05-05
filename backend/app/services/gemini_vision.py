@@ -18,64 +18,34 @@ SYSTEM_PROMPT = """Bạn là chuyên gia phân tích đề thi toán học Việ
 
 NHIỆM VỤ:
 1. Xác định từng bài toán/câu hỏi trên trang
-2. Với mỗi hình vẽ toán học trong bài, viết code Python Matplotlib để vẽ lại chính xác
+2. Với mỗi hình vẽ toán học, mô tả CHI TIẾT hình bằng lời (KHÔNG viết code)
 
 TRẢ VỀ JSON THUẦN TÚY (không có markdown, không có ```json):
 {
   "problems": [
     {
       "title": "Câu 1: Tên ngắn gọn",
-      "description": "Nội dung đề bài đầy đủ. Dùng [HÌNH_1] để đánh dấu vị trí hình vẽ trong đề.",
+      "description": "Nội dung đề bài đầy đủ. Dùng [HÌNH_1] để đánh dấu vị trí hình vẽ.",
       "difficulty": "easy | medium | hard",
       "category": "Hình học | Đại số | Giải tích | Lượng giác | Tổ hợp | Xác suất | Thống kê",
       "problem_type": "essay",
       "figures": [
         {
           "id": "HÌNH_1",
-          "description": "Mô tả hình: tam giác ABC vuông tại A, AB=3cm, BC=5cm",
-          "matplotlib_code": "# Code vẽ hình — xem quy tắc bên dưới\nfig, ax = plt.subplots(figsize=(6,5))\n..."
+          "description": "Mô tả đầy đủ: loại hình (tam giác/đường tròn/đồ thị...), tên điểm (A,B,C,O...), kích thước số (AB=3cm, R=5, góc=70°...), quan hệ hình học (vuông tại A, nội tiếp, tiếp tuyến...), phần cần tô màu hoặc nhấn mạnh"
         }
       ]
     }
   ]
 }
 
-QUY TẮC CHO matplotlib_code:
-- ĐÃ IMPORT SẴN: matplotlib.pyplot as plt, numpy as np, math, matplotlib.patches as patches
-- KHÔNG gọi plt.show() hay plt.savefig() — hệ thống tự lưu sau
-- KHÔNG import lại các thư viện trên
-- Được phép import: from mpl_toolkits.mplot3d import Axes3D (cho hình không gian)
-- Được phép import: from mpl_toolkits.mplot3d.art3d import Poly3DCollection
-
-CHO TỪNG LOẠI HÌNH:
-
-Hình học phẳng (tam giác, tứ giác, đường tròn):
-- Dùng tọa độ cụ thể từ đề bài (ví dụ: A=[0,3], B=[0,0], C=[4,0])
-- Vẽ đường thẳng bằng plt.plot(), góc vuông bằng patches.Rectangle()
-- Thêm nhãn đỉnh (A, B, C...) và số đo cạnh/góc
-- ax.set_aspect('equal'), ax.axis('off')
-
-Đồ thị hàm số (parabol, đường thẳng, lượng giác):
-- Dùng x = np.linspace(a, b, 400) để tạo dải giá trị
-- Vẽ lưới nhẹ: ax.grid(True, alpha=0.3)
-- Đánh dấu điểm đặc biệt bằng ax.scatter()
-- Thêm nhãn hàm số trong legend
-
-Hình không gian (hình hộp, hình chóp, mặt cầu):
-- Dùng fig = plt.figure(); ax = fig.add_subplot(111, projection='3d')
-- Vẽ các cạnh bằng ax.plot()
-- Mặt trong suốt bằng Poly3DCollection với alpha=0.15
-
-Biểu đồ/Thống kê (cột, tròn, đường):
-- Dùng ax.bar(), ax.pie(), ax.plot() tương ứng
-- Thêm nhãn giá trị trên mỗi cột/phần
-- Màu sắc rõ ràng, có legend
-
-LƯU Ý QUAN TRỌNG:
-- Nếu trang không có hình vẽ, để "figures": []
-- Nếu trang trắng hoặc không phải đề bài, trả về "problems": []
-- Viết tiếng Việt đầy đủ dấu trong title và description
-- Dùng ký hiệu Unicode cho toán: ², ³, √, ≤, ≥, π, ∞, ∈, ∀"""
+LƯU Ý:
+- figures[].description phải đủ thông tin để vẽ lại hình mà không cần nhìn ảnh gốc
+- Ghi rõ TẤT CẢ giá trị số (độ dài, góc, bán kính) từ hình
+- Nếu trang không có hình vẽ: "figures": []
+- Nếu trang trắng hoặc không phải đề bài: "problems": []
+- Viết tiếng Việt đầy đủ dấu
+- Dùng ký hiệu Unicode: ², ³, √, ≤, ≥, π, ∞, ∈, ∀"""
 
 
 def _call_gemini_sync(image_b64: str, page_text: str) -> List[Dict]:

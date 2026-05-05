@@ -281,6 +281,40 @@ async def generate_problems_bulk(body: BulkGenerateRequest, current_user = Depen
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Lỗi khi tạo hàng loạt: {str(e)}")
 
+@router.post("/{problem_id}/generate-figure")
+async def generate_problem_figure(
+    problem_id: UUID,
+    current_user=Depends(get_current_teacher),
+):
+    """
+    Dùng AI sinh hình vẽ Matplotlib từ mô tả bài toán, lưu vào figure_image (teacher only).
+    """
+    from app.services import figure_generator
+
+    # Lấy bài toán
+    check = supabase_client.table("problems").select("description, figure_image").eq("id", str(problem_id)).execute()
+    if not check.data:
+        raise HTTPException(status_code=404, detail="Không tìm thấy bài toán.")
+
+    description = check.data[0].get("description", "")
+    if not description:
+        raise HTTPException(status_code=400, detail="Bài toán chưa có mô tả để sinh hình.")
+
+    # Sinh hình qua figure_generator (chạy trong thread pool tránh block)
+    img_b64 = await asyncio.to_thread(figure_generator.generate_and_render, description)
+
+    if not img_b64:
+        raise HTTPException(
+            status_code=500,
+            detail="Không thể sinh hình vẽ. Kiểm tra GEMINI_API_KEY và nội dung bài toán.",
+        )
+
+    # Lưu vào DB
+    supabase_client.table("problems").update({"figure_image": img_b64}).eq("id", str(problem_id)).execute()
+
+    return {"figure_image": img_b64}
+
+
 @router.get("/", response_model=ProblemList)
 def get_problems(
     skip: int = Query(0, ge=0),

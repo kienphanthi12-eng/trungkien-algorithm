@@ -181,6 +181,14 @@ export async function updateProblem(token, problemId, problemData) {
   return response.json();
 }
 
+export async function generateProblemFigure(token, problemId) {
+  const response = await _authFetch(`${API_BASE_URL}/problems/${problemId}/generate-figure`, {
+    method: 'POST', headers: {},
+  }, token);
+  if (!response.ok) { const e = await response.json(); throw new Error(e.detail || 'Lỗi khi sinh hình vẽ'); }
+  return response.json(); // { figure_image: "base64..." }
+}
+
 // Helper: parse error detail safely
 async function _parseError(response, fallback) {
   try {

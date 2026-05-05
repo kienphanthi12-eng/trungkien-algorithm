@@ -17,7 +17,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from pydantic import BaseModel
 
 from app.api.dependencies import get_current_teacher
-from app.services import pdf_parser, gemini_vision, sandbox_executor
+from app.services import pdf_parser, gemini_vision, sandbox_executor, figure_generator
 
 router = APIRouter()
 
@@ -75,17 +75,19 @@ def _process_page_sync(page: dict) -> List[dict]:
     for prob in raw_problems:
         figures_out = []
 
-        # Bước 2: Sandbox thực thi matplotlib_code cho từng hình
+        # Bước 2: Dùng figure_generator (LLM chuyên vẽ) cho từng hình
+        # Gemini bước 1 chỉ trả về description — bước 2 sinh code từ description
+        prob_desc = prob.get("description", "")
         for fig in prob.get("figures", []):
-            code = fig.get("matplotlib_code", "").strip()
+            fig_desc = fig.get("description", "").strip()
             img_b64 = None
 
-            if code:
-                img_b64 = sandbox_executor.execute_and_encode(code, timeout=15)
+            if fig_desc:
+                img_b64 = figure_generator.generate_and_render(prob_desc, fig_desc)
 
             figures_out.append({
                 "id": fig.get("id", f"HÌNH_{len(figures_out)+1}"),
-                "description": fig.get("description", ""),
+                "description": fig_desc,
                 "image_b64": img_b64,
             })
 
