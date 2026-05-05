@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { getAssignments, deleteAssignment, getStudents } from '../services/api';
 import { Link } from 'react-router-dom';
-import logo from '../assets/logo.png';
 
 const STATUS_LABEL = {
   pending: { text: 'Chờ nộp', cls: 'bg-yellow-100 text-yellow-800' },
@@ -11,7 +10,7 @@ const STATUS_LABEL = {
 };
 
 export default function Assignments() {
-  const { user, token, logoutUser } = useAuth();
+  const { user, token } = useAuth();
   const [assignments, setAssignments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -74,35 +73,7 @@ export default function Assignments() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16 items-center">
-            <div className="flex items-center">
-              <Link to="/" className="flex items-center gap-2 mr-8">
-                <img src={logo} alt="ZENTUS" className="h-10 w-auto" />
-              </Link>
-              <div className="hidden md:flex">
-                <Link to="/" className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">Dashboard</Link>
-                {user?.role === 'teacher' && (
-                  <Link to="/students" className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">Học sinh</Link>
-                )}
-                <Link to="/problems" className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">Bài toán</Link>
-                <Link to="/assignments" className="text-blue-600 border-b-2 border-blue-600 px-3 py-2 rounded-md text-sm font-medium">Bài tập</Link>
-              </div>
-            </div>
-            <div className="flex items-center space-x-4">
-              <span className="text-gray-700 text-sm hidden sm:inline">
-                <span className="font-semibold">{user?.name}</span> ({user?.role === 'teacher' ? 'Giáo viên' : 'Học sinh'})
-              </span>
-              <button onClick={logoutUser} className="px-4 py-2 text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 transition-colors">
-                Đăng xuất
-              </button>
-            </div>
-          </div>
-        </div>
-      </nav>
-
+    <>
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 sm:px-0">
           <div className="flex justify-between items-center mb-6">
@@ -244,6 +215,6 @@ export default function Assignments() {
           </div>
         </div>
       </main>
-    </div>
+    </>
   );
 }

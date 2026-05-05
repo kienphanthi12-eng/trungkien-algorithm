@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Link } from 'react-router-dom';
-import logo from '../assets/logo.png';
 import { getAssignments, getStudents, getProblems, getExams } from '../services/api';
 
 // ── Stat Card ─────────────────────────────────────────────────────────────────
@@ -54,7 +53,7 @@ function NavCard({ to, gradient, iconBg, icon, title, desc, badge }) {
 
 // ── Main Component ─────────────────────────────────────────────────────────────
 export default function Dashboard() {
-  const { user, token, logoutUser } = useAuth();
+  const { user, token } = useAuth();
   const isTeacher = user?.role === 'teacher';
 
   const [stats, setStats] = useState(null);
@@ -135,37 +134,11 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 relative overflow-hidden">
+    <div className="relative overflow-hidden">
       {/* Blobs */}
       <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-purple-200/50 rounded-full blur-[120px] pointer-events-none" />
       <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-200/50 rounded-full blur-[120px] pointer-events-none" />
       <div className="absolute top-[40%] left-[50%] w-[30%] h-[30%] bg-green-100/30 rounded-full blur-[100px] pointer-events-none" />
-
-      {/* Nav */}
-      <nav className="sticky top-0 z-50 bg-white/70 backdrop-blur-md border-b border-white/20 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-20 items-center">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-white rounded-xl shadow-sm border border-white/40">
-                <img src={logo} alt="ZENTUS" className="h-10 w-auto"
-                  onError={(e) => { e.target.onerror = null; e.target.parentElement.innerHTML = '<span class="text-xl font-bold text-blue-600 px-1">Z</span>'; }} />
-              </div>
-              <span className="text-2xl font-black bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600 hidden sm:block">ZENTUS</span>
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="hidden md:flex flex-col items-end">
-                <span className="text-slate-900 font-bold text-sm">{user?.name}</span>
-                <span className={`text-[10px] uppercase tracking-wider font-bold ${isTeacher ? 'text-purple-600' : 'text-green-600'}`}>
-                  {isTeacher ? '👨‍🏫 Giáo viên' : '🎓 Học sinh'}
-                </span>
-              </div>
-              <button onClick={logoutUser} className="px-4 py-2 bg-red-50 hover:bg-red-500 text-red-600 hover:text-white text-sm font-bold rounded-xl transition-all duration-200 border border-red-200">
-                Đăng xuất
-              </button>
-            </div>
-          </div>
-        </div>
-      </nav>
 
       <main className="relative z-10 max-w-7xl mx-auto py-10 px-4 sm:px-6 lg:px-8 space-y-10">
 

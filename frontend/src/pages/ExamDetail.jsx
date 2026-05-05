@@ -8,8 +8,7 @@ import FigureRenderer from '../components/FigureRenderer';
 import FigureEditor from '../components/FigureEditor';
 import { useReactToPrint } from 'react-to-print';
 import React, { useRef } from 'react';
-import logo from '../assets/logo.png';
-import { 
+import {
   Printer, Share2, Trash2, PlusCircle, History, 
   ChevronDown, ChevronUp, Edit3, Save, X 
 } from 'lucide-react';
@@ -200,58 +199,30 @@ export default function ExamDetail() {
   // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-slate-50 relative overflow-hidden">
-      {/* Blobs */}
-      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-200/40 rounded-full blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-200/40 rounded-full blur-[120px] pointer-events-none" />
-
-      {/* Nav */}
-      <nav className="sticky top-0 z-50 bg-white/70 backdrop-blur-md border-b border-white/20 shadow-sm">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-20 items-center">
-            <div className="flex items-center gap-3">
-              <Link to="/exams" className="p-2 bg-white rounded-xl shadow-sm border border-white/40">
-                <img src={logo} alt="ZENTUS" className="h-10 w-auto" />
-              </Link>
-              <div>
-                <span className="text-xl font-black bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600">
-                  CHI TIẾT ĐỀ THI
-                </span>
-                <p className="text-xs text-slate-400 font-medium">{problems.length} câu hỏi</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              {user?.role === 'teacher' && (
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={handleCreateVariant}
-                    className="hidden sm:flex px-4 py-2.5 bg-white border border-blue-200 text-blue-600 text-sm font-bold rounded-xl hover:bg-blue-50 transition-all items-center gap-2"
-                  >
-                    ✨ Tạo biến thể AI
-                  </button>
-                  <button
-                    onClick={onPrintClick}
-                    className="px-4 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-sm font-bold rounded-xl shadow-lg shadow-blue-200 hover:scale-105 transition-all flex items-center gap-2"
-                  >
-                    🖨️ In đề / PDF
-                  </button>
-                  <button
-                    onClick={openModal}
-                    className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-sm font-bold rounded-xl shadow-lg shadow-blue-200 hover:scale-105 transition-all"
-                  >
-                    📤 Giao đề thi
-                  </button>
-                </div>
-              )}
-              <Link to="/exams" className="hidden sm:block text-sm font-bold text-slate-500 hover:text-slate-900 transition-colors">
-                ← Kho đề
-              </Link>
-            </div>
-          </div>
+    <>
+      {user?.role === 'teacher' && (
+        <div className="flex justify-end gap-2 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+          <button
+            onClick={handleCreateVariant}
+            className="px-4 py-2.5 bg-white border border-blue-200 text-blue-600 text-sm font-bold rounded-xl hover:bg-blue-50 transition-all flex items-center gap-2"
+          >
+            ✨ Tạo biến thể AI
+          </button>
+          <button
+            onClick={onPrintClick}
+            className="px-4 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-sm font-bold rounded-xl shadow-lg shadow-blue-200 hover:scale-105 transition-all flex items-center gap-2"
+          >
+            🖨️ In đề / PDF
+          </button>
+          <button
+            onClick={openModal}
+            className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-sm font-bold rounded-xl shadow-lg shadow-blue-200 hover:scale-105 transition-all"
+          >
+            📤 Giao đề thi
+          </button>
         </div>
-      </nav>
-
-      <main className="relative z-10 max-w-5xl mx-auto py-10 px-4 sm:px-6 lg:px-8 space-y-6">
+      )}
+      <main className="max-w-5xl mx-auto py-8 px-4 sm:px-6 lg:px-8 space-y-6">
 
         {/* Exam meta card */}
         <div className="bg-white/70 backdrop-blur-xl rounded-3xl border border-white/40 shadow-xl p-8">
@@ -533,6 +504,6 @@ export default function ExamDetail() {
           overflow: hidden;
         }
       `}</style>
-    </div>
+    </>
   );
 }

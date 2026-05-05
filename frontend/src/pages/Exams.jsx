@@ -2,10 +2,9 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Link } from 'react-router-dom';
 import { getExams, deleteExam, getStudents, createAssignment } from '../services/api';
-import logo from '../assets/logo.png';
 
 export default function Exams() {
-  const { user, token, logoutUser } = useAuth();
+  const { user, token } = useAuth();
   const [exams, setExams] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -91,44 +90,18 @@ export default function Exams() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 relative overflow-hidden">
-      {/* Background Blobs */}
-      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-purple-200/40 rounded-full blur-[120px] pointer-events-none"></div>
-      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-200/40 rounded-full blur-[120px] pointer-events-none"></div>
-
-      <nav className="sticky top-0 z-50 bg-white/70 backdrop-blur-md border-b border-white/20 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-20 items-center">
-            <div className="flex items-center gap-3">
-              <Link to="/dashboard" className="p-2 bg-white rounded-xl shadow-sm border border-white/40">
-                <img src={logo} alt="ZENTUS" className="h-10 w-auto" />
-              </Link>
-              <span className="text-xl font-black bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600">
-                KHO ĐỀ THI
-              </span>
-            </div>
-            <div className="flex items-center gap-4">
-              {user?.role === 'teacher' && (
-                <>
-                  <Link to="/exams/analyze" className="px-5 py-2.5 bg-white border border-purple-200 text-purple-700 text-sm font-bold rounded-xl hover:bg-purple-50 transition-all shadow-sm">
-                    ✨ AI Phân tích đề
-                  </Link>
-                  <Link to="/exams/create" className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-sm font-bold rounded-xl shadow-lg shadow-blue-200 hover:scale-105 transition-all">
-                    + Tạo đề thi mới
-                  </Link>
-                </>
-              )}
-              <button onClick={logoutUser} className="text-gray-500 hover:text-red-600 transition-colors">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                </svg>
-              </button>
-            </div>
-          </div>
+    <>
+      {user?.role === 'teacher' && (
+        <div className="flex justify-end gap-3 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+          <Link to="/exams/analyze" className="px-5 py-2.5 bg-white border border-purple-200 text-purple-700 text-sm font-bold rounded-xl hover:bg-purple-50 transition-all shadow-sm">
+            ✨ AI Phân tích đề
+          </Link>
+          <Link to="/exams/create" className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-sm font-bold rounded-xl shadow-lg shadow-blue-200 hover:scale-105 transition-all">
+            + Tạo đề thi mới
+          </Link>
         </div>
-      </nav>
-
-      <main className="relative z-10 max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
+      )}
+      <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center mb-8">
           <div>
             <h2 className="text-3xl font-black text-slate-900 tracking-tight">Danh sách đề thi</h2>
@@ -274,6 +247,6 @@ export default function Exams() {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

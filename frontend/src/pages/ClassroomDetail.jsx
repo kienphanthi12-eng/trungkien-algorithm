@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { getClassroom, getStudents, addStudentToClass, removeStudentFromClass, getExams, assignExamToClass } from '../services/api';
-import logo from '../assets/logo.png';
 
 export default function ClassroomDetail() {
   const { classroomId } = useParams();
@@ -138,34 +137,8 @@ export default function ClassroomDetail() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-50 relative overflow-hidden">
-      {/* Background Blobs */}
-      <div className="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-200/40 rounded-full blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-purple-200/40 rounded-full blur-[120px] pointer-events-none" />
-
-      {/* Nav */}
-      <nav className="sticky top-0 z-50 bg-white/70 backdrop-blur-md border-b border-white/20 shadow-sm">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-20 items-center">
-            <div className="flex items-center gap-3">
-              <Link to="/classrooms" className="p-2 bg-white rounded-xl shadow-sm border border-white/40">
-                <img src={logo} alt="ZENTUS" className="h-10 w-auto" />
-              </Link>
-              <div>
-                <span className="text-xl font-black bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600 uppercase">
-                  {classroom.name}
-                </span>
-                <p className="text-[10px] text-slate-400 font-bold tracking-widest uppercase">Chi tiết lớp học</p>
-              </div>
-            </div>
-            <Link to="/classrooms" className="text-sm font-bold text-slate-500 hover:text-slate-900 transition-colors">
-              ← Tất cả lớp
-            </Link>
-          </div>
-        </div>
-      </nav>
-
-      <main className="relative z-10 max-w-5xl mx-auto py-10 px-4 sm:px-6 lg:px-8 space-y-6">
+    <>
+      <main className="max-w-5xl mx-auto py-8 px-4 sm:px-6 lg:px-8 space-y-6">
         
         {/* Class Header Card */}
         <div className="bg-white/70 backdrop-blur-xl rounded-3xl border border-white/40 shadow-xl p-8">
@@ -364,6 +337,6 @@ export default function ClassroomDetail() {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

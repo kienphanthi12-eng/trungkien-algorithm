@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Link } from 'react-router-dom';
 import { getClassrooms, createClassroom } from '../services/api';
-import logo from '../assets/logo.png';
 
 export default function ClassroomList() {
   const { user, token } = useAuth();
@@ -54,39 +53,19 @@ export default function ClassroomList() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 relative overflow-hidden">
-      {/* Background Blobs */}
-      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-200/40 rounded-full blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-200/40 rounded-full blur-[120px] pointer-events-none" />
-
-      {/* Nav */}
-      <nav className="sticky top-0 z-50 bg-white/70 backdrop-blur-md border-b border-white/20 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-20 items-center">
-            <div className="flex items-center gap-3">
-              <Link to="/dashboard" className="p-2 bg-white rounded-xl shadow-sm border border-white/40">
-                <img src={logo} alt="ZENTUS" className="h-10 w-auto" />
-              </Link>
-              <div>
-                <span className="text-xl font-black bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600 uppercase">
-                  Quản lý Lớp học
-                </span>
-                <p className="text-[10px] text-slate-400 font-bold tracking-widest uppercase">ZENTUS EDUCATION</p>
-              </div>
-            </div>
-            {user?.role === 'teacher' && (
-              <button
-                onClick={() => setShowModal(true)}
-                className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-sm font-bold rounded-xl shadow-lg shadow-blue-200 hover:scale-105 transition-all"
-              >
-                + Tạo lớp mới
-              </button>
-            )}
-          </div>
+    <>
+      {user?.role === 'teacher' && (
+        <div className="flex justify-between items-center max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-2">
+          <h1 className="text-2xl font-black text-slate-900">Quản lý Lớp học</h1>
+          <button
+            onClick={() => setShowModal(true)}
+            className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-sm font-bold rounded-xl shadow-lg shadow-blue-200 hover:scale-105 transition-all"
+          >
+            + Tạo lớp mới
+          </button>
         </div>
-      </nav>
-
-      <main className="relative z-10 max-w-7xl mx-auto py-10 px-4 sm:px-6 lg:px-8">
+      )}
+      <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4" />
@@ -196,6 +175,6 @@ export default function ClassroomList() {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

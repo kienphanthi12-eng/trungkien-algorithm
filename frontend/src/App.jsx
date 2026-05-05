@@ -1,6 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import ProtectedRoute from './components/ProtectedRoute'
+import TeacherRoute from './components/TeacherRoute'
+import AppLayout from './layouts/AppLayout'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import Dashboard from './pages/Dashboard'
@@ -24,118 +26,32 @@ function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
-          <Route
-            path="/"
-            element={
-              <ProtectedRoute>
-                <Dashboard />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/students"
-            element={
-              <ProtectedRoute>
-                <Students />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/problems"
-            element={
-              <ProtectedRoute>
-                <Problems />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/problems/create"
-            element={
-              <ProtectedRoute>
-                <CreateProblem />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/problems/:problemId"
-            element={
-              <ProtectedRoute>
-                <ProblemDetail />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/problems/:problemId/edit"
-            element={
-              <ProtectedRoute>
-                <CreateProblem />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/exams"
-            element={
-              <ProtectedRoute>
-                <Exams />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/exams/create"
-            element={
-              <ProtectedRoute>
-                <CreateExam />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/exams/analyze"
-            element={
-              <ProtectedRoute>
-                <AnalyzeExam />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/exams/:examId"
-            element={
-              <ProtectedRoute>
-                <ExamDetail />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/assignments"
-            element={
-              <ProtectedRoute>
-                <Assignments />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/assignments/:assignmentId"
-            element={
-              <ProtectedRoute>
-                <AssignmentDetail />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/classrooms"
-            element={
-              <ProtectedRoute>
-                <ClassroomList />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/classrooms/:classroomId"
-            element={
-              <ProtectedRoute>
-                <ClassroomDetail />
-              </ProtectedRoute>
-            }
-          />
+
+          {/* All protected routes share auth guard + role-based layout */}
+          <Route element={<ProtectedRoute />}>
+            <Route element={<AppLayout />}>
+              {/* Shared routes (teacher + student) */}
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/problems" element={<Problems />} />
+              <Route path="/problems/:problemId" element={<ProblemDetail />} />
+              <Route path="/exams" element={<Exams />} />
+              <Route path="/exams/:examId" element={<ExamDetail />} />
+              <Route path="/assignments" element={<Assignments />} />
+              <Route path="/assignments/:assignmentId" element={<AssignmentDetail />} />
+              <Route path="/classrooms" element={<ClassroomList />} />
+              <Route path="/classrooms/:classroomId" element={<ClassroomDetail />} />
+
+              {/* Teacher-only routes */}
+              <Route element={<TeacherRoute />}>
+                <Route path="/students" element={<Students />} />
+                <Route path="/problems/create" element={<CreateProblem />} />
+                <Route path="/problems/:problemId/edit" element={<CreateProblem />} />
+                <Route path="/exams/create" element={<CreateExam />} />
+                <Route path="/exams/analyze" element={<AnalyzeExam />} />
+              </Route>
+            </Route>
+          </Route>
+
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AuthProvider>

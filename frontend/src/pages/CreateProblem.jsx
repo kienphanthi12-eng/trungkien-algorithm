@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import logo from '../assets/logo.png';
 import { createProblem, updateProblem, getProblem, generateProblem, generateProblemsBulk } from '../services/api';
 
 export default function CreateProblem() {
-  const { user, token, logoutUser } = useAuth();
+  const { user, token } = useAuth();
   const { problemId } = useParams();
   const navigate = useNavigate();
   const isEdit = !!problemId;
@@ -175,28 +174,7 @@ export default function CreateProblem() {
   const typeLabel = { multiple_choice: 'Trắc nghiệm', true_false: 'Đúng / Sai', trivia: 'Đố vui', essay: 'Tự luận', algorithm: 'Lập trình' };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16 items-center">
-            <div className="flex items-center">
-              <Link to="/" className="flex items-center gap-2 mr-8">
-                <img src={logo} alt="ZENTUS" className="h-10 w-auto" />
-              </Link>
-              <div className="hidden md:block">
-                <Link to="/" className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">Dashboard</Link>
-                <Link to="/students" className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">Học sinh</Link>
-                <Link to="/problems" className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">Bài toán</Link>
-              </div>
-            </div>
-            <div className="flex items-center space-x-4">
-              <span className="text-gray-700 text-sm hidden sm:inline"><span className="font-semibold">{user?.name}</span> (Giáo viên)</span>
-              <button onClick={logoutUser} className="px-4 py-2 text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700">Đăng xuất</button>
-            </div>
-          </div>
-        </div>
-      </nav>
-
+    <>
       <main className="max-w-4xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 sm:px-0">
           <Link to="/problems" className="text-blue-600 hover:text-blue-800 text-sm font-medium mb-4 inline-block">← Quay lại</Link>
@@ -470,6 +448,6 @@ export default function CreateProblem() {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

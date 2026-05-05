@@ -2,10 +2,9 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { getStudents, addStudent, removeStudent } from '../services/api';
 import { Link } from 'react-router-dom';
-import logo from '../assets/logo.png';
 
 export default function Students() {
-  const { user, token, logoutUser } = useAuth();
+  const { user, token } = useAuth();
   const [students, setStudents] = useState([]);
   const [newEmail, setNewEmail] = useState('');
   const [loading, setLoading] = useState(true);
@@ -52,47 +51,8 @@ export default function Students() {
     }
   };
 
-  if (user?.role !== 'teacher') {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <p className="text-xl font-semibold text-red-600">Truy cập bị từ chối</p>
-          <p className="mt-2 text-gray-600">Chỉ giáo viên mới có quyền truy cập trang này.</p>
-          <Link to="/" className="mt-4 inline-block text-blue-600 hover:underline">Quay lại Dashboard</Link>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16 items-center">
-            <div className="flex items-center">
-              <Link to="/" className="flex items-center gap-2 mr-8">
-                <img src={logo} alt="ZENTUS" className="h-10 w-auto" />
-              </Link>
-              <div className="hidden md:block">
-                <Link to="/" className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">Dashboard</Link>
-                <Link to="/students" className="text-blue-600 border-b-2 border-blue-600 px-3 py-2 rounded-md text-sm font-medium">Học sinh</Link>
-              </div>
-            </div>
-            <div className="flex items-center space-x-4">
-              <span className="text-gray-700 text-sm hidden sm:inline">
-                <span className="font-semibold">{user?.name}</span> (Giáo viên)
-              </span>
-              <button
-                onClick={logoutUser}
-                className="px-4 py-2 text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 transition-colors"
-              >
-                Đăng xuất
-              </button>
-            </div>
-          </div>
-        </div>
-      </nav>
-
+    <>
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 sm:px-0">
           <h2 className="text-2xl font-bold text-gray-900 mb-6">Quản lý học sinh</h2>
@@ -150,6 +110,6 @@ export default function Students() {
           </div>
         </div>
       </main>
-    </div>
+    </>
   );
 }

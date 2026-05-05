@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useParams, Link } from 'react-router-dom';
-import logo from '../assets/logo.png';
 import {
   getAssignment,
   deleteAssignment,
@@ -42,7 +41,7 @@ function ScoreBadge({ score }) {
 }
 
 export default function AssignmentDetail() {
-  const { user, token, logoutUser } = useAuth();
+  const { user, token } = useAuth();
   const { assignmentId } = useParams();
   const navigate = useNavigate();
 
@@ -220,7 +219,7 @@ export default function AssignmentDetail() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="flex items-center justify-center py-20">
         <div className="text-gray-500">Đang tải...</div>
       </div>
     );
@@ -228,7 +227,7 @@ export default function AssignmentDetail() {
 
   if (error || !assignment) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="flex items-center justify-center py-20">
         <div className="text-center">
           <p className="text-red-600 font-semibold">{error || 'Không tìm thấy bài tập'}</p>
           <Link to="/assignments" className="mt-4 inline-block text-blue-600 hover:underline">
@@ -244,36 +243,7 @@ export default function AssignmentDetail() {
   const grade = submission?.grade;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Nav */}
-      <nav className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16 items-center">
-            <div className="flex items-center">
-              <Link to="/" className="flex items-center gap-2 mr-8">
-                <img src={logo} alt="ZENTUS" className="h-10 w-auto" />
-              </Link>
-              <div className="hidden md:flex">
-                <Link to="/" className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">Dashboard</Link>
-                {user?.role === 'teacher' && (
-                  <Link to="/students" className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">Học sinh</Link>
-                )}
-                <Link to="/problems" className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">Bài toán</Link>
-                <Link to="/assignments" className="text-blue-600 border-b-2 border-blue-600 px-3 py-2 rounded-md text-sm font-medium">Bài tập</Link>
-              </div>
-            </div>
-            <div className="flex items-center space-x-4">
-              <span className="text-gray-700 text-sm hidden sm:inline">
-                <span className="font-semibold">{user?.name}</span> ({user?.role === 'teacher' ? 'Giáo viên' : 'Học sinh'})
-              </span>
-              <button onClick={logoutUser} className="px-4 py-2 text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 transition-colors">
-                Đăng xuất
-              </button>
-            </div>
-          </div>
-        </div>
-      </nav>
-
+    <>
       <main className="max-w-4xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 sm:px-0">
           <Link to="/assignments" className="text-blue-600 hover:text-blue-800 text-sm font-medium mb-4 inline-block">
@@ -727,6 +697,6 @@ export default function AssignmentDetail() {
           )}
         </div>
       )}
-    </div>
+    </>
   );
 }
