@@ -17,6 +17,7 @@ import { useNavigate } from 'react-router-dom';
 import MarkdownRenderer from '../components/MarkdownRenderer';
 import FigureRenderer from '../components/FigureRenderer';
 import FigureEditor from '../components/FigureEditor';
+import ExamProblemView from '../components/ExamProblemView';
 
 
 const STATUS_LABEL = {
@@ -345,26 +346,19 @@ export default function AssignmentDetail() {
             </div>
           </div>
 
-          {/* Problem Content (Description) */}
+          {/* Problem Content */}
           {problem?.description && (
             <div className="bg-white shadow rounded-lg overflow-hidden mb-6 p-6">
-              <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Nội dung đề bài</h2>
-              <MarkdownRenderer content={problem.description} />
-              {problem.figure_image && (
-                <div className="my-6 flex justify-center">
-                  <img
-                    src={`data:image/png;base64,${problem.figure_image}`}
-                    alt="Hình vẽ minh hoạ"
-                    className="max-w-full h-auto rounded-xl border border-slate-200 shadow-inner bg-white"
-                    style={{ maxHeight: '420px' }}
-                  />
-                </div>
-              )}
-              {!problem.figure_image && problem.figure_json && <FigureRenderer data={problem.figure_json} />}
+              <ExamProblemView
+                problem={problem}
+                mode="view"
+                userRole={user?.role}
+                showCorrect={user?.role === 'teacher'}
+              />
 
-              {/* Editor for Teacher */}
+              {/* Công cụ hình vẽ (chỉ giáo viên) */}
               {user?.role === 'teacher' && (
-                <div className="mt-4 pt-4 border-t border-gray-100">
+                <div className="mt-5 pt-4 border-t border-gray-100">
                   {editingProblem ? (
                     <FigureEditor
                       initialData={problem.figure_json}
@@ -374,7 +368,7 @@ export default function AssignmentDetail() {
                   ) : (
                     <button
                       onClick={() => setEditingProblem(true)}
-                      className="text-xs flex items-center gap-1 text-blue-600 hover:text-blue-800 font-medium py-1.5 px-3 rounded-lg bg-blue-50 border border-blue-100"
+                      className="text-xs flex items-center gap-1 text-blue-600 hover:text-blue-800 font-medium py-1.5 px-3 rounded bg-blue-50 border border-blue-100"
                     >
                       ✏️ {(problem.figure_json || problem.figure_image) ? 'Sửa hình vẽ' : 'Thêm hình vẽ'}
                     </button>
@@ -391,51 +385,20 @@ export default function AssignmentDetail() {
                 <h2 className="text-lg font-semibold text-gray-900">📝 Làm bài</h2>
               </div>
 
-              {/* MCQ: chọn A/B/C/D */}
-              {problem?.problem_type === 'multiple_choice' ? (
-                <div className="px-6 py-5 space-y-3">
+              {/* MCQ / True-False: dùng ExamProblemView interactive */}
+              {(problem?.problem_type === 'multiple_choice' || problem?.problem_type === 'true_false') ? (
+                <div className="px-6 py-5 space-y-4">
                   {submitError && <div className="p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">{submitError}</div>}
-                  <p className="text-sm text-gray-600 mb-3">Chọn phương án đúng:</p>
-                  {['A', 'B', 'C', 'D'].map(k => problem.choices?.[k] ? (
-                    <button key={k} type="button"
-                      onClick={() => setAnswerText(k)}
-                      className={`w-full flex items-start gap-3 p-3 rounded-lg border text-left transition-colors ${
-                        answerText === k
-                          ? 'bg-blue-600 border-blue-600 text-white'
-                          : 'bg-white border-gray-300 text-gray-800 hover:border-blue-400 hover:bg-blue-50'
-                      }`}>
-                      <span className={`w-7 h-7 flex items-center justify-center rounded-full text-sm font-bold shrink-0 mt-0.5 ${
-                        answerText === k ? 'bg-white text-blue-600' : 'bg-gray-100 text-gray-700'
-                      }`}>{k}</span>
-                      <span className="text-sm">{problem.choices[k]}</span>
-                    </button>
-                  ) : null)}
-                  <div className="flex justify-end pt-2">
+                  <ExamProblemView
+                    problem={problem}
+                    mode="answer"
+                    userRole="student"
+                    selectedAnswer={answerText}
+                    onSelectAnswer={setAnswerText}
+                  />
+                  <div className="flex justify-end pt-1">
                     <button onClick={handleSubmit} disabled={submitting || !answerText}
-                      className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 font-medium">
-                      {submitting ? 'Đang nộp...' : '📤 Nộp đáp án'}
-                    </button>
-                  </div>
-                </div>
-              ) : problem?.problem_type === 'true_false' ? (
-                <div className="px-6 py-5 space-y-3">
-                  {submitError && <div className="p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">{submitError}</div>}
-                  <p className="text-sm text-gray-600 mb-3">Mệnh đề trên là:</p>
-                  <div className="flex gap-4">
-                    {['true', 'false'].map(v => (
-                      <button key={v} type="button" onClick={() => setAnswerText(v)}
-                        className={`flex-1 py-4 rounded-lg text-lg font-bold border transition-colors ${
-                          answerText === v
-                            ? v === 'true' ? 'bg-green-500 text-white border-green-500' : 'bg-red-500 text-white border-red-500'
-                            : 'bg-white border-gray-300 text-gray-700 hover:border-blue-400'
-                        }`}>
-                        {v === 'true' ? '✓ ĐÚNG' : '✗ SAI'}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="flex justify-end pt-2">
-                    <button onClick={handleSubmit} disabled={submitting || !answerText}
-                      className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 font-medium">
+                      className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 font-medium text-sm">
                       {submitting ? 'Đang nộp...' : '📤 Nộp đáp án'}
                     </button>
                   </div>

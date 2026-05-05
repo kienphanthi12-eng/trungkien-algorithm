@@ -6,7 +6,7 @@ import rehypeKatex from 'rehype-katex';
  * Component render nội dung Markdown có hỗ trợ công thức Toán học LaTeX.
  * Hỗ trợ: $x^2$ (inline) và $$x^2$$ (block).
  */
-export default function MarkdownRenderer({ content, className = "" }) {
+export default function MarkdownRenderer({ content, className = "", compact = false }) {
   if (!content) return null;
 
   // Tiền xử lý để hỗ trợ các ký tự LaTeX và sửa lỗi bảng Markdown bị dính dòng
@@ -25,7 +25,7 @@ export default function MarkdownRenderer({ content, className = "" }) {
   const processedContent = preProcessContent(content);
 
   return (
-    <div className={`prose prose-slate max-w-none prose-math:my-4 ${className}`}>
+    <div className={`prose prose-slate max-w-none ${compact ? '[&_p]:my-0 [&_p]:leading-snug text-sm' : 'prose-math:my-4'} ${className}`}>
       <ReactMarkdown
         remarkPlugins={[remarkMath]}
         rehypePlugins={[rehypeKatex]}

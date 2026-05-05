@@ -6,6 +6,7 @@ import { getProblem, getStudents, createAssignment, updateProblem, generateProbl
 import MarkdownRenderer from '../components/MarkdownRenderer';
 import FigureRenderer from '../components/FigureRenderer';
 import FigureEditor from '../components/FigureEditor';
+import ExamProblemView from '../components/ExamProblemView';
 
 
 
@@ -217,40 +218,33 @@ export default function ProblemDetail() {
               </div>
             </div>
 
-            {/* Description */}
+            {/* Đề bài + phương án — layout học thuật */}
             <div className="mb-6 pb-6 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900 mb-3">Đề bài</h2>
-              <MarkdownRenderer content={problem.description} />
-              {problem.figure_image && (
-                <div className="my-6 flex justify-center">
-                  <img
-                    src={`data:image/png;base64,${problem.figure_image}`}
-                    alt="Hình vẽ minh hoạ"
-                    className="max-w-full h-auto rounded-xl border border-slate-200 shadow-inner bg-white"
-                    style={{ maxHeight: '420px' }}
-                  />
-                </div>
-              )}
-              {!problem.figure_image && problem.figure_json && <FigureRenderer data={problem.figure_json} />}
+              <ExamProblemView
+                problem={problem}
+                mode="view"
+                userRole={user?.role}
+                showCorrect={user?.role === 'teacher'}
+              />
 
-              {/* Figure tools for Teacher */}
+              {/* Công cụ hình vẽ (chỉ giáo viên) */}
               {user?.role === 'teacher' && (
-                <div className="mt-4 space-y-2">
+                <div className="mt-5 pt-4 border-t border-gray-100 space-y-2">
                   {figureError && (
-                    <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{figureError}</p>
+                    <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">{figureError}</p>
                   )}
                   <div className="flex items-center gap-2 flex-wrap">
                     <button
                       onClick={handleGenerateFigure}
                       disabled={generatingFigure}
-                      className="text-xs flex items-center gap-1 text-violet-700 hover:text-violet-900 font-medium py-1.5 px-3 rounded-lg bg-violet-50 border border-violet-200 disabled:opacity-50"
+                      className="text-xs flex items-center gap-1 text-violet-700 hover:text-violet-900 font-medium py-1.5 px-3 rounded bg-violet-50 border border-violet-200 disabled:opacity-50"
                     >
                       {generatingFigure ? '⏳ Đang sinh hình...' : '✨ Sinh hình AI'}
                     </button>
                     {!editingFigure && (
                       <button
                         onClick={() => setEditingFigure(true)}
-                        className="text-xs flex items-center gap-1 text-blue-600 hover:text-blue-800 font-medium py-1.5 px-3 rounded-lg bg-blue-50 border border-blue-100"
+                        className="text-xs flex items-center gap-1 text-blue-600 hover:text-blue-800 font-medium py-1.5 px-3 rounded bg-blue-50 border border-blue-100"
                       >
                         ✏️ {(problem.figure_json || problem.figure_image) ? 'Sửa hình JSON' : 'Thêm hình JSON'}
                       </button>
@@ -266,35 +260,6 @@ export default function ProblemDetail() {
                 </div>
               )}
             </div>
-
-            {/* MCQ choices */}
-            {problem.problem_type === 'multiple_choice' && problem.choices && (
-              <div className="mb-6 pb-6 border-b border-gray-200">
-                <h2 className="text-lg font-semibold text-gray-900 mb-3">Phương án</h2>
-                <div className="space-y-2">
-                  {['A', 'B', 'C', 'D'].map(k => {
-                    const isCorrect = user?.role === 'teacher' && problem.correct_answer === k;
-                    return problem.choices[k] ? (
-                      <div key={k} className={`flex items-start gap-3 p-3 rounded-lg border ${isCorrect ? 'bg-green-50 border-green-300' : 'bg-gray-50 border-gray-200'}`}>
-                        <span className={`w-7 h-7 flex items-center justify-center rounded-full text-sm font-bold shrink-0 mt-0.5 ${isCorrect ? 'bg-green-500 text-white' : 'bg-white border border-gray-300 text-gray-700'}`}>{k}</span>
-                        <span className="text-gray-800 text-sm">{problem.choices[k]}</span>
-                        {isCorrect && <span className="ml-auto text-green-600 text-xs font-semibold shrink-0">✓ Đáp án đúng</span>}
-                      </div>
-                    ) : null;
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* True/False answer (teacher only) */}
-            {problem.problem_type === 'true_false' && user?.role === 'teacher' && problem.correct_answer && (
-              <div className="mb-6 pb-6 border-b border-gray-200">
-                <h2 className="text-lg font-semibold text-gray-900 mb-2">Đáp án</h2>
-                <span className={`inline-block px-4 py-2 rounded-lg font-semibold text-sm ${problem.correct_answer === 'true' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                  {problem.correct_answer === 'true' ? '✓ Đúng' : '✗ Sai'}
-                </span>
-              </div>
-            )}
 
             {/* Solution (teacher only) */}
             {user?.role === 'teacher' && problem.solution && (
