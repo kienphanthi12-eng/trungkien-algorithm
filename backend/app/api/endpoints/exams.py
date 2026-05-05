@@ -52,16 +52,19 @@ BƯỚC 3 — TẠO PHƯƠNG ÁN NHIỄU (chỉ MCQ):
 - 3 phương án sai = kết quả của 3 lỗi tư duy phổ biến (sai dấu, nhầm công thức, sai bước trung gian).
 - Phương án nhiễu phải KHÁC với correct_answer.
 
-BƯỚC 4 — KIỂM TRA BẮT BUỘC trước khi output:
-□ MCQ: Thử từng đáp án A,B,C,D — xác nhận CHỈ ĐÚNG MỘT. Nếu có 2 đáp án đúng → chọn lại số liệu khác.
-□ Đúng/Sai: Mỗi mệnh đề phải có giá trị Đúng/Sai rõ ràng, không mơ hồ.
-□ Nhất quán: Các dữ kiện trong câu không mâu thuẫn (điểm trên đồ thị, tọa độ, bảng số liệu).
-□ TXĐ đúng: Hàm số/phương trình phải có miền xác định phù hợp với dữ kiện đã cho.
-□ HÌNH VẼ: Nếu đề gốc có figure_json, hãy cập nhật tọa độ các điểm trong figure_json để khớp với dữ kiện mới trong câu hỏi.
+BƯỚC 4 — KIỂM TRA BẮT BUỘC NGUYÊN TẮC TOÁN HỌC (Validation):
+- ĐIỀU KIỆN XÁC ĐỊNH: Phải đảm bảo MẪU SỐ KHÁC 0. 
+- Biểu thức trong căn bậc chẵn (căn bậc 2, 4) PHẢI KHÔNG ÂM (>=0).
+- Biểu thức trong logarit PHẢI DƯƠNG (>0), cơ số dương và khác 1.
+- HÌNH HỌC: Độ dài các cạnh phải lớn hơn 0 và tuân thủ Bất đẳng thức tam giác. Giá trị lượng giác (sin, cos) phải thuộc [-1, 1].
+- MCQ: Thử từng đáp án A,B,C,D — xác nhận CHỈ ĐÚNG MỘT. 
+
+Để đảm bảo bạn không làm sai, bạn PHẢI THÊM trường "math_validation" vào output JSON để tự xác nhận điều kiện (VD: "Đã kiểm tra mẫu số x-2 khác 0 với các đáp án, tam giác thoả mãn BĐT").
 
 ĐỊNH DẠNG OUTPUT — chỉ trả về mảng JSON, không kèm text nào khác:
 [
   {
+    "original_id": "Mã ID của câu hỏi gốc (giữ nguyên không đổi)",
     "title": "Câu X",
     "description": "Nội dung câu hỏi. Dùng $...$ cho công thức inline, $$...$$ cho công thức riêng dòng. Bảng biến thiên/số liệu dùng Markdown table (| col |).",
     "problem_type": "multiple_choice | true_false | essay",
@@ -70,6 +73,7 @@ BƯỚC 4 — KIỂM TRA BẮT BUỘC trước khi output:
     "difficulty": "easy | medium | hard",
     "category": "giữ nguyên category gốc",
     "solution": "Lời giải từng bước đầy đủ, dùng LaTeX cho công thức. Phải chứng minh tại sao correct_answer đúng VÀ tại sao các đáp án còn lại sai.",
+    "math_validation": "Chuỗi tự xác nhận bạn đã kiểm tra điều kiện xác định",
     "figure_json": { "viewBox": "0 0 400 300", "elements": [...] }
   }
 ]"""
@@ -90,6 +94,8 @@ class ExtractedQuestion(BaseModel):
     figure_bbox: Optional[List[int]] = None
     page_index: int = 0
     figure_image: Optional[str] = None
+    original_id: Optional[str] = None
+    math_validation: Optional[str] = None
 
 
 class ExamFromQuestions(BaseModel):
@@ -637,12 +643,15 @@ def generate_exam_variant(
     if not problems:
         raise HTTPException(status_code=400, detail="Đề thi này chưa có câu hỏi nào để tạo biến thể.")
 
-    # 2. Prepare questions for AI
+    # 2. Prepare questions for AI and map images
     source_questions = []
+    image_map = {}
     for ep in problems:
         p = ep.get("problem")
         if p:
+            prob_id = p.get("id")
             source_questions.append({
+                "original_id": prob_id,
                 "title": p.get("title"),
                 "description": p.get("description"),
                 "problem_type": p.get("problem_type"),
@@ -651,6 +660,11 @@ def generate_exam_variant(
                 "difficulty": p.get("difficulty"),
                 "category": p.get("category"),
             })
+            if prob_id:
+                image_map[prob_id] = {
+                    "figure_image": p.get("figure_image"),
+                    "figure_json": p.get("figure_json")
+                }
 
     # 3. Call DeepSeek AI — chia batch 5 câu để tránh bị cắt JSON
     api_key = os.environ.get("DEEPSEEK_API_KEY", "").strip()
@@ -712,6 +726,15 @@ def generate_exam_variant(
             new_questions_data.extend(variants)
         print(f"[VARIANT] ✅ Tổng {len(new_questions_data)} câu biến thể", flush=True)
 
+        # Re-attach images/json based on original_id
+        for q in new_questions_data:
+            orig_id = q.get("original_id")
+            if orig_id and orig_id in image_map:
+                if not q.get("figure_image"):
+                    q["figure_image"] = image_map[orig_id]["figure_image"]
+                # If LLM didn't return a new figure_json, keep the old one
+                if not q.get("figure_json"):
+                    q["figure_json"] = image_map[orig_id]["figure_json"]
 
         # 4. Create the new variant exam
         new_exam_data = ExamFromQuestions(
