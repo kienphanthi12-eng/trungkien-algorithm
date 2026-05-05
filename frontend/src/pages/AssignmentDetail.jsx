@@ -18,6 +18,7 @@ import MarkdownRenderer from '../components/MarkdownRenderer';
 import FigureRenderer from '../components/FigureRenderer';
 import FigureEditor from '../components/FigureEditor';
 import ExamProblemView from '../components/ExamProblemView';
+import PrintableExam from '../components/PrintableExam';
 
 
 const STATUS_LABEL = {
@@ -238,24 +239,47 @@ export default function AssignmentDetail() {
     );
   }
 
+  const isExam = !!assignment?.exam_id;
   const statusInfo = STATUS_LABEL[assignment.status] || STATUS_LABEL.pending;
   const isOverdue = assignment.due_date && new Date(assignment.due_date) < new Date() && assignment.status === 'pending';
   const grade = submission?.grade;
 
   return (
     <>
-      <main className="max-w-4xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="px-4 sm:px-0">
-          <Link to="/assignments" className="text-blue-600 hover:text-blue-800 text-sm font-medium mb-4 inline-block">
+      <main className={`${isExam ? 'max-w-[1600px]' : 'max-w-4xl'} mx-auto py-6 sm:px-6 lg:px-8`}>
+        <div className="px-4 sm:px-0 mb-4 flex items-center justify-between">
+          <Link to="/assignments" className="text-blue-600 hover:text-blue-800 text-sm font-medium inline-block">
             ← Quay lại danh sách bài tập
           </Link>
+          {isExam && (
+            <span className="bg-purple-100 text-purple-800 text-xs font-bold px-3 py-1 rounded-full border border-purple-200">
+              Chế độ thi
+            </span>
+          )}
+        </div>
 
-          {error && (
-            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">{error}</div>
+        {error && (
+          <div className="px-4 sm:px-0 mb-4">
+            <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">{error}</div>
+          </div>
+        )}
+
+        <div className={`px-4 sm:px-0 ${isExam ? 'flex flex-col lg:flex-row gap-6 items-start' : 'space-y-6'}`}>
+          
+          {/* ── LEFT PANE (Exam Paper) ── */}
+          {isExam && exam && (
+            <div className="w-full lg:w-[60%] bg-gray-200/80 p-2 sm:p-6 lg:p-8 rounded-2xl shadow-inner lg:h-[85vh] overflow-y-auto">
+               <div className="mx-auto shadow-2xl overflow-hidden rounded border border-gray-300 transform-gpu origin-top scale-[0.8] sm:scale-100 max-w-[21cm]">
+                 <PrintableExam exam={exam} />
+               </div>
+            </div>
           )}
 
+          {/* ── RIGHT PANE (or SINGLE COLUMN) ── */}
+          <div className={`${isExam ? 'w-full lg:w-[40%] lg:h-[85vh] overflow-y-auto pr-2 space-y-6' : 'w-full space-y-6'}`}>
+
           {/* Assignment card */}
-          <div className="bg-white shadow rounded-lg overflow-hidden mb-6">
+          <div className="bg-white shadow rounded-lg overflow-hidden">
             {/* Header */}
             <div className="px-6 py-5 border-b border-gray-200 flex items-start justify-between">
               <div>
@@ -336,8 +360,8 @@ export default function AssignmentDetail() {
           </div>
 
           {/* Problem Content */}
-          {problem?.description && (
-            <div className="bg-white shadow rounded-lg overflow-hidden mb-6 p-6">
+          {!isExam && problem?.description && (
+            <div className="bg-white shadow rounded-lg overflow-hidden p-6">
               <ExamProblemView
                 problem={problem}
                 mode="view"
@@ -362,34 +386,6 @@ export default function AssignmentDetail() {
                       ✏️ {(problem.figure_json || problem.figure_image) ? 'Sửa hình vẽ' : 'Thêm hình vẽ'}
                     </button>
                   )}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ── Nội dung đề thi (exam assignment) ── */}
-          {exam && (
-            <div className="bg-white shadow rounded-lg overflow-hidden mb-6 p-6">
-              <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Đề thi</h2>
-              {exam.description && (
-                <p className="text-gray-700 text-sm mb-4">{exam.description}</p>
-              )}
-              {exam.problems?.length > 0 && (
-                <div className="space-y-6">
-                  {exam.problems.map((ep, idx) => {
-                    const q = ep.problem || ep;
-                    return (
-                      <div key={q.id || idx} className="border border-gray-200 rounded-lg p-4">
-                        <p className="text-xs font-semibold text-gray-400 mb-2">Câu {idx + 1}</p>
-                        <ExamProblemView
-                          problem={q}
-                          mode="view"
-                          userRole={user?.role}
-                          showCorrect={user?.role === 'teacher'}
-                        />
-                      </div>
-                    );
-                  })}
                 </div>
               )}
             </div>
@@ -595,7 +591,9 @@ export default function AssignmentDetail() {
               Đang tải thông tin bài nộp...
             </div>
           )}
-        </div>
+
+          </div> {/* End Right Pane */}
+        </div> {/* End Split Screen Wrapper */}
       </main>
 
       {/* ── AI Chat Widget (students only) ── */}
