@@ -9,7 +9,9 @@ import os
 import json
 import base64
 import httpx
+import asyncio
 from typing import List, Dict
+from app.services.llm_proxy import LLMProxy
 
 
 GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
@@ -50,62 +52,40 @@ LƯU Ý:
 
 def _call_gemini_sync(image_b64: str, page_text: str) -> List[Dict]:
     """
-    Gọi Gemini Flash API với ảnh trang PDF.
+    Gọi Gemini Flash API với ảnh trang PDF thông qua LLMProxy.
     Trả về list các bài toán đã parse.
     """
-    api_key = os.environ.get("GEMINI_API_KEY", "")
-    if not api_key:
-        raise ValueError("GEMINI_API_KEY chưa được cấu hình trong environment variables.")
-
-    payload = {
-        "contents": [
-            {
-                "parts": [
-                    {
-                        "text": SYSTEM_PROMPT
-                    },
-                    {
-                        "inline_data": {
-                            "mime_type": "image/png",
-                            "data": image_b64
-                        }
-                    },
-                    {
-                        "text": (
-                            f"Text thô từ trang (để tham khảo thêm):\n{page_text}\n\n"
-                            "Hãy phân tích ảnh trang PDF trên và trả về JSON theo đúng cấu trúc đã mô tả."
-                        )
-                    }
-                ]
-            }
-        ],
-        "generationConfig": {
-            "temperature": 0.1,       # Thấp để kết quả ổn định, chính xác
-            "maxOutputTokens": 8192,
-            "responseMimeType": "application/json"
-        }
-    }
-
-    resp = httpx.post(
-        f"{GEMINI_API_URL}?key={api_key}",
-        json=payload,
-        timeout=120.0,
-        headers={"Content-Type": "application/json"}
+    full_prompt = (
+        SYSTEM_PROMPT + "\n\n"
+        f"Text thô từ trang (để tham khảo thêm):\n{page_text}\n\n"
+        "Hãy phân tích ảnh trang PDF trên và trả về JSON theo đúng cấu trúc đã mô tả."
     )
-    resp.raise_for_status()
 
-    result = resp.json()
-    raw_text = result["candidates"][0]["content"]["parts"][0]["text"].strip()
+    try:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        response = loop.run_until_complete(LLMProxy.vision_completion(
+            image_b64=image_b64,
+            prompt=full_prompt,
+            temperature=0.1
+        ))
+        loop.close()
+        
+        raw_text = response["content"].strip()
 
-    # Strip markdown nếu Gemini vẫn wrap
-    if raw_text.startswith("```"):
-        raw_text = raw_text.split("```")[1]
-        if raw_text.startswith("json"):
-            raw_text = raw_text[4:]
-        raw_text = raw_text.strip()
+        # Strip markdown nếu Gemini vẫn wrap
+        if raw_text.startswith("```"):
+            raw_text = raw_text.split("```")[1]
+            if raw_text.startswith("json"):
+                raw_text = raw_text[4:]
+            raw_text = raw_text.strip()
 
-    parsed = json.loads(raw_text)
-    return parsed.get("problems", [])
+        parsed = json.loads(raw_text)
+        return parsed.get("problems", [])
+    except Exception as e:
+        import logging
+        logging.error(f"Lỗi phân tích trang PDF với Gemini Vision: {e}")
+        return []
 
 
 def analyze_page(image_b64: str, page_text: str) -> List[Dict]:

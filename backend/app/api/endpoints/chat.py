@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from typing import List
 from app.services.supabase_client import supabase_client
 from app.api.dependencies import get_current_user
+from app.services.llm_proxy import LLMProxy
 
 router = APIRouter()
 
@@ -155,27 +156,6 @@ def _get_problem_context(assignment_id: str) -> str:
 
 
 
-def _call_llm_chat_sync(system_prompt: str, messages: list) -> str:
-    """Call DeepSeek. Sync, called via asyncio.to_thread."""
-    import httpx
-    api_key = os.environ.get("DEEPSEEK_API_KEY", "")
-    if not api_key:
-        raise ValueError("Chưa cấu hình DEEPSEEK_API_KEY.")
-    resp = httpx.post(
-        "https://api.deepseek.com/chat/completions",
-        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-        json={
-            "model": "deepseek-chat",
-            "messages": [{"role": "system", "content": system_prompt}] + messages,
-            "max_tokens": 600,
-            "temperature": 0.7,
-        },
-        timeout=30.0,
-    )
-    resp.raise_for_status()
-    return resp.json()["choices"][0]["message"]["content"].strip()
-
-
 # ─── Endpoints ─────────────────────────────────────────────────────────────────
 
 @router.get("/quota")
@@ -233,7 +213,13 @@ async def chat_message(
     messages.append({"role": "user", "content": body.message.strip()})
 
     try:
-        reply = await asyncio.to_thread(_call_llm_chat_sync, system_prompt, messages)
+        full_messages = [{"role": "system", "content": system_prompt}] + messages
+        response = await LLMProxy.chat_completion(
+            messages=full_messages,
+            max_tokens=600,
+            temperature=0.7
+        )
+        reply = response["content"]
 
         # ── Increment usage after successful reply ─────────────────────────
         if not is_teacher:

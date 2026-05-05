@@ -9,6 +9,8 @@ from datetime import datetime, timezone
 from app.services.supabase_client import supabase_client
 from app.api.dependencies import get_current_user
 from app.schemas.submissions import Submission, SubmissionCreate, SubmissionList
+from app.services.llm_proxy import LLMProxy
+import asyncio
 
 router = APIRouter()
 
@@ -129,69 +131,51 @@ def _parse_grading_response(response_text: str) -> dict:
     return feedback
 
 
-def _grade_with_deepseek(problem_title: str, problem_description: str, answer_text: str,
-                         system_prompt: str = None) -> dict:
-    """Call DeepSeek API (OpenAI-compatible). Cheapest option."""
-    import httpx
-
-    api_key = os.environ.get("DEEPSEEK_API_KEY", "")
-    if not api_key:
-        raise ValueError("DEEPSEEK_API_KEY not configured")
-
-    user_msg = _build_grading_user_msg(problem_title, problem_description, answer_text)
-
-    resp = httpx.post(
-        "https://api.deepseek.com/chat/completions",
-        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-        json={
-            "model": "deepseek-chat",
-            "messages": [
-                {"role": "system", "content": system_prompt or GRADING_SYSTEM_PROMPT},
-                {"role": "user", "content": user_msg},
-            ],
-            "max_tokens": 1024,
-            "temperature": 0.2,
-        },
-        timeout=60.0,
-    )
-    resp.raise_for_status()
-    data = resp.json()
-
-    response_text = data["choices"][0]["message"]["content"].strip()
-    feedback = _parse_grading_response(response_text)
-
-    # DeepSeek pricing: ~$0.14/MTok input, $0.28/MTok output (deepseek-chat)
-    usage = data.get("usage", {})
-    input_tokens = usage.get("prompt_tokens", 0)
-    output_tokens = usage.get("completion_tokens", 0)
-    llm_cost = (input_tokens * 0.00000014) + (output_tokens * 0.00000028)
-
-    return {"score": feedback["score"], "feedback_json": feedback, "llm_cost": llm_cost, "model": "deepseek-chat"}
-
-
 def _call_llm_grader(problem_title: str, problem_description: str, answer_text: str,
                      system_prompt: str = None) -> dict:
-    """Grade with DeepSeek. Returns: {"score": float, "feedback_json": dict, "llm_cost": float}"""
+    """Grade with LLMProxy. Returns: {"score": float, "feedback_json": dict, "llm_cost": float}"""
     sp = system_prompt or GRADING_SYSTEM_PROMPT
-    api_key = os.environ.get("DEEPSEEK_API_KEY", "")
-    if not api_key:
-        raise ValueError("Chưa cấu hình DEEPSEEK_API_KEY.")
-    return _grade_with_deepseek(problem_title, problem_description, answer_text, sp)
+    user_msg = _build_grading_user_msg(problem_title, problem_description, answer_text)
 
-    return {
-        "score": 5.0,
-        "feedback_json": {
+    messages = [
+        {"role": "system", "content": sp},
+        {"role": "user", "content": user_msg},
+    ]
+
+    try:
+        # Run async LLMProxy in this sync thread
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        response = loop.run_until_complete(LLMProxy.chat_completion(
+            messages=messages,
+            max_tokens=1024,
+            temperature=0.2,
+            response_format={"type": "json_object"}
+        ))
+        loop.close()
+
+        feedback = _parse_grading_response(response["content"])
+        return {
+            "score": feedback["score"],
+            "feedback_json": feedback,
+            "llm_cost": response["cost"],
+            "model": response["model"]
+        }
+    except Exception as e:
+        return {
             "score": 5.0,
-            "overall": "Chưa cấu hình API key. Vui lòng thêm DEEPSEEK_API_KEY hoặc ANTHROPIC_API_KEY vào Railway.",
-            "criteria": {
-                "correctness": {"score": 5, "comment": "Chưa đánh giá"},
-                "clarity": {"score": 5, "comment": "Chưa đánh giá"},
-                "efficiency": {"score": 5, "comment": "Chưa đánh giá"},
+            "feedback_json": {
+                "score": 5.0,
+                "overall": f"Lỗi gọi AI chấm bài: {e}",
+                "criteria": {
+                    "correctness": {"score": 5, "comment": "Chưa đánh giá"},
+                    "clarity": {"score": 5, "comment": "Chưa đánh giá"},
+                    "efficiency": {"score": 5, "comment": "Chưa đánh giá"},
+                },
             },
-        },
-        "llm_cost": 0.0,
-        "model": "none",
-    }
+            "llm_cost": 0.0,
+            "model": "none",
+        }
 
 
 def _auto_grade_objective(problem_type: str, correct_answer: str, student_answer: str) -> dict:
