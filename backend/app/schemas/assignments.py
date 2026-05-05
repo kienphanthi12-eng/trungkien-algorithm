@@ -26,7 +26,7 @@ class AssignmentUpdate(BaseModel):
 
 class Assignment(BaseModel):
     id: UUID
-    teacher_id: UUID
+    teacher_id: Optional[UUID] = None
     student_id: UUID
     problem_id: Optional[UUID] = None
     exam_id: Optional[UUID] = None
