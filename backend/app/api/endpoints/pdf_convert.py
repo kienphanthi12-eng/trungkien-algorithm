@@ -83,7 +83,10 @@ def _process_page_sync(page: dict) -> List[dict]:
             img_b64 = None
 
             if fig_desc:
-                img_b64 = figure_generator.generate_and_render(prob_desc, fig_desc)
+                try:
+                    img_b64 = figure_generator.generate_and_render(prob_desc, fig_desc)
+                except Exception as e:
+                    print(f"[pdf_convert] figure_generator lỗi: {e}")
 
             figures_out.append({
                 "id": fig.get("id", f"HÌNH_{len(figures_out)+1}"),

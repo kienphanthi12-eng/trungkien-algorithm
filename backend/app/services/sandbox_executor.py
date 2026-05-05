@@ -10,6 +10,7 @@ Cơ chế bảo vệ:
 """
 
 import subprocess
+import sys
 import tempfile
 import base64
 import os
@@ -93,15 +94,18 @@ def execute_matplotlib_code(code: str, timeout: int = 15) -> bytes:
 
     try:
         # 4. Chạy trong subprocess với timeout
+        # Dùng sys.executable để đảm bảo cùng Python runtime với FastAPI
+        mpl_dir = os.path.join(tempfile.gettempdir(), "matplotlib_cfg")
+        os.makedirs(mpl_dir, exist_ok=True)
         result = subprocess.run(
-            ["python3", script_path],
+            [sys.executable, script_path],
             capture_output=True,
             timeout=timeout,
             env={
                 "PATH": os.environ.get("PATH", "/usr/bin:/usr/local/bin"),
-                "HOME": os.environ.get("HOME", "/tmp"),
+                "HOME": os.environ.get("HOME", tempfile.gettempdir()),
                 "MPLBACKEND": "Agg",
-                "MPLCONFIGDIR": "/tmp/matplotlib",
+                "MPLCONFIGDIR": mpl_dir,
             },
         )
 

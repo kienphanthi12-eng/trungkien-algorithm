@@ -1,19 +1,17 @@
 """
 figure_generator.py — Bước 2 pipeline: mô tả hình → Matplotlib code → PNG base64.
 
-Gọi Gemini với prompt chuyên biệt về toán học để sinh code ĐÚNG hình học,
-sau đó thực thi qua sandbox_executor.
+LLM chính: DeepSeek (text → code, đã hoạt động trên Railway)
+LLM phụ:   Gemini (fallback nếu DeepSeek không có key)
 """
 
 import os
+import json
 import httpx
 from typing import Optional
 
 from app.services import sandbox_executor
 
-GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
-
-# Prompt chuyên biệt: dạy LLM cách vẽ đúng từng loại hình toán học
 FIGURE_CODE_PROMPT = """\
 Bạn là chuyên gia vẽ hình toán học Việt Nam bằng Python Matplotlib.
 
@@ -32,10 +30,9 @@ Bài: "Góc nội tiếp ABC = 70°, tìm số đo cung nhỏ AC"
   R = 1.0
   ins = 70                          # góc nội tiếp (thay bằng giá trị thực tế)
   arc = 2 * ins                     # cung AC = 2 × góc nội tiếp
-  # A và C đối xứng qua trục y, cung nhỏ ở PHÍA TRÊN
-  aA = math.radians(90 + arc / 2)  # ví dụ: 160°
-  aC = math.radians(90 - arc / 2)  # ví dụ:  20°
-  aB = math.radians(260)            # B phía dưới trên cung lớn
+  aA = math.radians(90 + arc / 2)  # A trái trên
+  aC = math.radians(90 - arc / 2)  # C phải trên
+  aB = math.radians(260)            # B phía dưới
   A = [R*math.cos(aA), R*math.sin(aA)]
   C = [R*math.cos(aC), R*math.sin(aC)]
   B = [R*math.cos(aB), R*math.sin(aB)]
@@ -61,7 +58,7 @@ VÍ DỤ 2 — TAM GIÁC (vuông, cân, thường)
 Bài: "Tam giác ABC vuông tại A, AB=3cm, AC=4cm, BC=5cm"
 
   fig, ax = plt.subplots(figsize=(6, 5))
-  A, B, C = [0,0], [0,3], [4,0]    # tọa độ tính từ độ dài thực tế
+  A, B, C = [0,0], [0,3], [4,0]
   ax.add_patch(plt.Polygon([A,B,C], fill=False, edgecolor='black', lw=2))
   ax.add_patch(patches.Rectangle(A, 0.25, 0.25, fill=False, edgecolor='black', lw=1.2))
   for pt, lbl, (dx,dy) in [(A,'A',(-0.25,-0.2)),(B,'B',(-0.25,0.15)),(C,'C',(0.15,-0.2))]:
@@ -90,7 +87,7 @@ Bài: "Vẽ parabol y = x² - 2x - 3"
   ax.set_xlabel('x'); ax.set_ylabel('y')
 
 ══════════════════════════════════════════════════════════════════
-VÍ DỤ 4 — HÌNH KHÔNG GIAN (chóp, hộp, lăng trụ)
+VÍ DỤ 4 — HÌNH KHÔNG GIAN
 Bài: "Hình hộp chữ nhật ABCD.A'B'C'D', AB=3, AD=4, AA'=5"
 
   from mpl_toolkits.mplot3d import Axes3D
@@ -100,16 +97,10 @@ Bài: "Hình hộp chữ nhật ABCD.A'B'C'D', AB=3, AD=4, AA'=5"
   a, b, c = 3, 4, 5
   verts = [[0,0,0],[a,0,0],[a,b,0],[0,b,0],
            [0,0,c],[a,0,c],[a,b,c],[0,b,c]]
-  edges = [(0,1),(1,2),(2,3),(3,0),(4,5),(5,6),(6,7),(7,4),
-           (0,4),(1,5),(2,6),(3,7)]
+  edges = [(0,1),(1,2),(2,3),(3,0),(4,5),(5,6),(6,7),(7,4),(0,4),(1,5),(2,6),(3,7)]
   for i,j in edges:
       xs,ys,zs = zip(verts[i],verts[j])
       ax.plot(xs,ys,zs,'b-',lw=1.2)
-  lbls = 'A B C D A\' B\' C\' D\''.split()
-  offs = [(-0.2,-0.2,0),( 0.1,-0.2,0),( 0.1, 0.1,0),(-0.2, 0.1,0),
-          (-0.2,-0.2,0.1),(0.1,-0.2,0.1),(0.1,0.1,0.1),(-0.2,0.1,0.1)]
-  for (x,y,z),lbl,(dx,dy,dz) in zip(verts,lbls,offs):
-      ax.text(x+dx,y+dy,z+dz,lbl,fontsize=10,fontweight='bold')
   ax.set_axis_off()
 
 ══════════════════════════════════════════════════════════════════
@@ -118,57 +109,111 @@ QUY TẮC BẮT BUỘC:
 - Nhãn điểm đúng với bài (A, B, C, O, M, N…)
 - ax.set_aspect('equal') cho mọi hình phẳng
 - ax.axis('off') cho hình hình học (không cần trục số)
-- fontsize: nhãn đỉnh 12-14, nhãn cạnh 9-11
-- Màu: đường chính 'black', highlight 'red'/'#e53e3e', đường phụ 'blue'
+- fontsize nhãn đỉnh 12-14, nhãn cạnh 9-11
 """
 
 
-def generate_figure_code(problem_description: str, figure_hint: str = "") -> Optional[str]:
-    """
-    Gọi Gemini sinh Matplotlib code từ mô tả bài toán.
-    figure_hint: mô tả ngắn hình cần vẽ (tuỳ chọn, lấy từ bước 1 PDF pipeline).
-    Trả về code string hoặc None nếu lỗi.
-    """
-    api_key = os.environ.get("GEMINI_API_KEY", "")
+def _call_deepseek(description: str, hint: str) -> str:
+    """Gọi DeepSeek sinh Matplotlib code. Raise nếu thất bại."""
+    api_key = os.environ.get("DEEPSEEK_API_KEY", "")
     if not api_key:
-        return None
+        raise RuntimeError("DEEPSEEK_API_KEY chưa được cấu hình.")
 
-    user_msg = f"Bài toán:\n{problem_description}"
-    if figure_hint:
-        user_msg += f"\n\nMô tả hình cần vẽ:\n{figure_hint}"
+    user_msg = f"Bài toán:\n{description}"
+    if hint:
+        user_msg += f"\n\nMô tả hình cần vẽ:\n{hint}"
     user_msg += "\n\nViết Matplotlib code vẽ hình này. Chỉ code Python thuần."
 
-    payload = {
-        "contents": [{"parts": [{"text": FIGURE_CODE_PROMPT}, {"text": user_msg}]}],
-        "generationConfig": {"temperature": 0.1, "maxOutputTokens": 4096},
-    }
+    resp = httpx.post(
+        "https://api.deepseek.com/chat/completions",
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+        json={
+            "model": "deepseek-chat",
+            "messages": [
+                {"role": "system", "content": FIGURE_CODE_PROMPT},
+                {"role": "user", "content": user_msg},
+            ],
+            "temperature": 0.1,
+            "max_tokens": 3000,
+        },
+        timeout=90.0,
+    )
+    resp.raise_for_status()
+    code = resp.json()["choices"][0]["message"]["content"].strip()
+    # Strip markdown fences nếu model vẫn bọc code
+    if code.startswith("```"):
+        code = code.split("```")[1]
+        if code.startswith("python"):
+            code = code[6:]
+        code = code.rstrip("`").strip()
+    return code
 
-    try:
-        resp = httpx.post(
-            f"{GEMINI_URL}?key={api_key}",
-            json=payload,
-            timeout=90.0,
-            headers={"Content-Type": "application/json"},
-        )
-        resp.raise_for_status()
-        code = resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
-        if code.startswith("```"):
-            code = code.split("```")[1]
-            if code.startswith("python"):
-                code = code[6:]
-            code = code.rstrip("`").strip()
-        return code
-    except Exception as e:
-        print(f"[figure_generator] Gemini error: {e}")
-        return None
+
+def _call_gemini(description: str, hint: str) -> str:
+    """Gọi Gemini sinh Matplotlib code. Raise nếu thất bại."""
+    api_key = os.environ.get("GEMINI_API_KEY", "")
+    if not api_key:
+        raise RuntimeError("GEMINI_API_KEY chưa được cấu hình.")
+
+    user_msg = f"Bài toán:\n{description}"
+    if hint:
+        user_msg += f"\n\nMô tả hình:\n{hint}"
+    user_msg += "\n\nViết Matplotlib code. Chỉ code Python thuần."
+
+    resp = httpx.post(
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
+        f"?key={api_key}",
+        json={
+            "contents": [{"parts": [{"text": FIGURE_CODE_PROMPT}, {"text": user_msg}]}],
+            "generationConfig": {"temperature": 0.1, "maxOutputTokens": 4096},
+        },
+        timeout=90.0,
+        headers={"Content-Type": "application/json"},
+    )
+    resp.raise_for_status()
+    code = resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+    if code.startswith("```"):
+        code = code.split("```")[1]
+        if code.startswith("python"):
+            code = code[6:]
+        code = code.rstrip("`").strip()
+    return code
 
 
-def generate_and_render(problem_description: str, figure_hint: str = "") -> Optional[str]:
+def generate_figure_code(problem_description: str, figure_hint: str = "") -> str:
+    """
+    Sinh Matplotlib code từ mô tả bài toán.
+    Thử DeepSeek trước, fallback sang Gemini.
+    Raise RuntimeError với lý do cụ thể nếu cả hai đều thất bại.
+    """
+    errors = []
+
+    # Ưu tiên DeepSeek (text model, đáng tin cậy hơn cho code)
+    if os.environ.get("DEEPSEEK_API_KEY"):
+        try:
+            return _call_deepseek(problem_description, figure_hint)
+        except Exception as e:
+            errors.append(f"DeepSeek: {e}")
+
+    # Fallback sang Gemini
+    if os.environ.get("GEMINI_API_KEY"):
+        try:
+            return _call_gemini(problem_description, figure_hint)
+        except Exception as e:
+            errors.append(f"Gemini: {e}")
+
+    raise RuntimeError(
+        "Không thể gọi LLM để sinh code. "
+        + (" | ".join(errors) if errors else "Chưa cấu hình DEEPSEEK_API_KEY hoặc GEMINI_API_KEY.")
+    )
+
+
+def generate_and_render(problem_description: str, figure_hint: str = "") -> str:
     """
     Sinh code → thực thi qua sandbox → trả về PNG base64.
-    Trả về None nếu thất bại ở bất kỳ bước nào.
+    Raise RuntimeError với lý do cụ thể nếu thất bại.
     """
     code = generate_figure_code(problem_description, figure_hint)
-    if not code:
-        return None
-    return sandbox_executor.execute_and_encode(code)
+    png_bytes = sandbox_executor.execute_matplotlib_code(code)  # raises on error
+    import base64
+    return base64.b64encode(png_bytes).decode("utf-8")

@@ -301,13 +301,10 @@ async def generate_problem_figure(
         raise HTTPException(status_code=400, detail="Bài toán chưa có mô tả để sinh hình.")
 
     # Sinh hình qua figure_generator (chạy trong thread pool tránh block)
-    img_b64 = await asyncio.to_thread(figure_generator.generate_and_render, description)
-
-    if not img_b64:
-        raise HTTPException(
-            status_code=500,
-            detail="Không thể sinh hình vẽ. Kiểm tra GEMINI_API_KEY và nội dung bài toán.",
-        )
+    try:
+        img_b64 = await asyncio.to_thread(figure_generator.generate_and_render, description)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Lỗi sinh hình vẽ: {e}")
 
     # Lưu vào DB
     supabase_client.table("problems").update({"figure_image": img_b64}).eq("id", str(problem_id)).execute()
