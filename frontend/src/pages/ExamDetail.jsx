@@ -266,13 +266,14 @@ export default function ExamDetail() {
                 if (!ep) return null;
                 const p = ep.problem || ep;
                 if (!p) return null;
-                const isExpanded = expandedIdx === idx;
+                const isStudent = user?.role === 'student';
+                const isExpanded = isStudent || expandedIdx === idx;
                 return (
                   <div key={ep.id || idx} className="border border-slate-200 rounded-2xl overflow-hidden">
                     {/* Header */}
                     <div
-                      className="flex items-center gap-3 px-5 py-4 cursor-pointer hover:bg-slate-50 transition-colors"
-                      onClick={() => setExpandedIdx(isExpanded ? null : idx)}
+                      className={`flex items-center gap-3 px-5 py-4 ${isStudent ? '' : 'cursor-pointer hover:bg-slate-50 transition-colors'}`}
+                      onClick={() => !isStudent && setExpandedIdx(isExpanded ? null : idx)}
                     >
                       <span className="w-8 h-8 bg-blue-100 text-blue-700 rounded-full flex items-center justify-center text-sm font-black flex-shrink-0">
                         {idx + 1}
@@ -288,13 +289,15 @@ export default function ExamDetail() {
                         <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">
                           {TYPE_LABELS[p.problem_type] || p.problem_type}
                         </span>
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          className={`h-4 w-4 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-                          fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                        >
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
+                        {!isStudent && (
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            className={`h-4 w-4 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                            fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        )}
                       </div>
                     </div>
 

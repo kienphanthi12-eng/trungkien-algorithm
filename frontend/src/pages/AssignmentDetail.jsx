@@ -374,19 +374,22 @@ export default function AssignmentDetail() {
               {exam.description && (
                 <p className="text-gray-700 text-sm mb-4">{exam.description}</p>
               )}
-              {exam.questions?.length > 0 && (
+              {exam.problems?.length > 0 && (
                 <div className="space-y-6">
-                  {exam.questions.map((q, idx) => (
-                    <div key={q.id || idx} className="border border-gray-200 rounded-lg p-4">
-                      <p className="text-xs font-semibold text-gray-400 mb-2">Câu {idx + 1}</p>
-                      <ExamProblemView
-                        problem={q}
-                        mode="view"
-                        userRole={user?.role}
-                        showCorrect={user?.role === 'teacher'}
-                      />
-                    </div>
-                  ))}
+                  {exam.problems.map((ep, idx) => {
+                    const q = ep.problem || ep;
+                    return (
+                      <div key={q.id || idx} className="border border-gray-200 rounded-lg p-4">
+                        <p className="text-xs font-semibold text-gray-400 mb-2">Câu {idx + 1}</p>
+                        <ExamProblemView
+                          problem={q}
+                          mode="view"
+                          userRole={user?.role}
+                          showCorrect={user?.role === 'teacher'}
+                        />
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
