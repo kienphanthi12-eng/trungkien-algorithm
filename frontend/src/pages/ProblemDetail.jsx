@@ -206,7 +206,17 @@ export default function ProblemDetail() {
             <div className="mb-6 pb-6 border-b border-gray-200">
               <h2 className="text-lg font-semibold text-gray-900 mb-3">Đề bài</h2>
               <MarkdownRenderer content={problem.description} />
-              {problem.figure_json && <FigureRenderer data={problem.figure_json} />}
+              {problem.figure_image && (
+                <div className="my-6 flex justify-center">
+                  <img
+                    src={`data:image/png;base64,${problem.figure_image}`}
+                    alt="Hình vẽ minh hoạ"
+                    className="max-w-full h-auto rounded-xl border border-slate-200 shadow-inner bg-white"
+                    style={{ maxHeight: '420px' }}
+                  />
+                </div>
+              )}
+              {!problem.figure_image && problem.figure_json && <FigureRenderer data={problem.figure_json} />}
 
               {/* Figure Editor for Teacher */}
               {user?.role === 'teacher' && (
@@ -222,7 +232,7 @@ export default function ProblemDetail() {
                       onClick={() => setEditingFigure(true)}
                       className="text-xs flex items-center gap-1 text-blue-600 hover:text-blue-800 font-medium py-1.5 px-3 rounded-lg bg-blue-50 border border-blue-100"
                     >
-                      ✏️ {problem.figure_json ? 'Sửa hình vẽ' : 'Thêm hình vẽ'}
+                      ✏️ {(problem.figure_json || problem.figure_image) ? 'Sửa hình vẽ' : 'Thêm hình vẽ'}
                     </button>
                   )}
                 </div>

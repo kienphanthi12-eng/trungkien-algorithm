@@ -350,23 +350,33 @@ export default function AssignmentDetail() {
             <div className="bg-white shadow rounded-lg overflow-hidden mb-6 p-6">
               <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Nội dung đề bài</h2>
               <MarkdownRenderer content={problem.description} />
-              {problem.figure_json && <FigureRenderer data={problem.figure_json} />}
+              {problem.figure_image && (
+                <div className="my-6 flex justify-center">
+                  <img
+                    src={`data:image/png;base64,${problem.figure_image}`}
+                    alt="Hình vẽ minh hoạ"
+                    className="max-w-full h-auto rounded-xl border border-slate-200 shadow-inner bg-white"
+                    style={{ maxHeight: '420px' }}
+                  />
+                </div>
+              )}
+              {!problem.figure_image && problem.figure_json && <FigureRenderer data={problem.figure_json} />}
 
               {/* Editor for Teacher */}
               {user?.role === 'teacher' && (
                 <div className="mt-4 pt-4 border-t border-gray-100">
                   {editingProblem ? (
-                    <FigureEditor 
+                    <FigureEditor
                       initialData={problem.figure_json}
                       onSave={handleUpdateFigure}
                       onCancel={() => setEditingProblem(false)}
                     />
                   ) : (
-                    <button 
+                    <button
                       onClick={() => setEditingProblem(true)}
                       className="text-xs flex items-center gap-1 text-blue-600 hover:text-blue-800 font-medium py-1.5 px-3 rounded-lg bg-blue-50 border border-blue-100"
                     >
-                      ✏️ {problem.figure_json ? 'Sửa hình vẽ' : 'Thêm hình vẽ'}
+                      ✏️ {(problem.figure_json || problem.figure_image) ? 'Sửa hình vẽ' : 'Thêm hình vẽ'}
                     </button>
                   )}
                 </div>
