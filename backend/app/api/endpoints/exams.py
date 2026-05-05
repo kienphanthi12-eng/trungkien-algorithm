@@ -235,74 +235,80 @@ def analyze_exam_file(
         import io as _io
         import re as _re
 
-        # ── Chỉ hỗ trợ PDF có text layer (deepseek-chat là text-only) ─────
-        if media_type != "application/pdf":
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    "DeepSeek chỉ hỗ trợ PDF có text layer, không phân tích được ảnh trực tiếp. "
-                    "Vui lòng tải lên file PDF (xuất từ Word/Google Docs)."
-                ),
-            )
-
-        # ── Trích xuất text: thử pypdf trước, fallback PyMuPDF ───────────
+        is_pdf = media_type == "application/pdf"
         extracted_text = ""
+        words = []
+        has_images = False
 
-        # Bước 1: pypdf
-        try:
-            import pypdf as _pypdf
-            reader = _pypdf.PdfReader(_io.BytesIO(raw))
-            pages_text = []
-            for page in reader.pages:
-                t = page.extract_text() or ""
-                if t.strip():
-                    pages_text.append(t)
-            extracted_text = "\n\n".join(pages_text).strip()
-            print(f"[ANALYZE] pypdf: {len(reader.pages)} trang, {len(extracted_text)} ký tự", flush=True)
-        except Exception as e:
-            print(f"[ANALYZE] pypdf lỗi: {e}", flush=True)
+        if is_pdf:
+            # ── Trích xuất text: thử pypdf trước, fallback PyMuPDF ───────────
+            # Bước 1: pypdf
+            try:
+                import pypdf as _pypdf
+                reader = _pypdf.PdfReader(_io.BytesIO(raw))
+                pages_text = []
+                for page in reader.pages:
+                    t = page.extract_text() or ""
+                    if t.strip():
+                        pages_text.append(t)
+                extracted_text = "\n\n".join(pages_text).strip()
+                print(f"[ANALYZE] pypdf: {len(reader.pages)} trang, {len(extracted_text)} ký tự", flush=True)
+            except Exception as e:
+                print(f"[ANALYZE] pypdf lỗi: {e}", flush=True)
 
-        # Bước 2: nếu pypdf cho ít text → thử PyMuPDF (tốt hơn với font đặc biệt, MathType, v.v.)
-        words = _re.findall(r'[a-zA-ZÀ-ỹ\d]{2,}', extracted_text)
-        if len(words) < 20:
-            print(f"[ANALYZE] pypdf kém ({len(words)} từ) → thử PyMuPDF...", flush=True)
+            # Bước 2: nếu pypdf cho ít text → thử PyMuPDF (tốt hơn với font đặc biệt, MathType, v.v.)
+            words = _re.findall(r'[a-zA-ZÀ-ỹ\d]{2,}', extracted_text)
             try:
                 import fitz  # PyMuPDF
                 doc = fitz.open(stream=raw, filetype="pdf")
-                pages_text = []
+                # Kiểm tra xem PDF có hình ảnh nào không
                 for page in doc:
-                    t = page.get_text("text") or ""
-                    if t.strip():
-                        pages_text.append(t)
-                fitz_text = "\n\n".join(pages_text).strip()
-                fitz_words = _re.findall(r'[a-zA-ZÀ-ỹ\d]{2,}', fitz_text)
-                print(f"[ANALYZE] PyMuPDF: {len(doc)} trang, {len(fitz_text)} ký tự, {len(fitz_words)} từ", flush=True)
-                if len(fitz_words) > len(words):
-                    extracted_text = fitz_text
-                    words = fitz_words
+                    if len(page.get_images()) > 0:
+                        has_images = True
+                        break
+                
+                if len(words) < 20:
+                    print(f"[ANALYZE] pypdf kém ({len(words)} từ) → thử PyMuPDF...", flush=True)
+                    pages_text = []
+                    for page in doc:
+                        t = page.get_text("text") or ""
+                        if t.strip():
+                            pages_text.append(t)
+                    fitz_text = "\n\n".join(pages_text).strip()
+                    fitz_words = _re.findall(r'[a-zA-ZÀ-ỹ\d]{2,}', fitz_text)
+                    print(f"[ANALYZE] PyMuPDF: {len(doc)} trang, {len(fitz_text)} ký tự, {len(fitz_words)} từ", flush=True)
+                    if len(fitz_words) > len(words):
+                        extracted_text = fitz_text
+                        words = fitz_words
                 doc.close()
             except ImportError:
                 print("[ANALYZE] PyMuPDF chưa cài", flush=True)
             except Exception as e:
                 print(f"[ANALYZE] PyMuPDF lỗi: {e}", flush=True)
 
-        # Bước 3: PDF image-based → Gemini Vision (đọc cả hình vẽ, công thức)
-        if len(words) < 20:
-            print(f"[ANALYZE] PDF image-based ({len(words)} từ) → Gemini Vision...", flush=True)
+        # Quyết định dùng model nào
+        use_gemini = (not is_pdf) or (len(words) < 20) or has_images
+
+        # Bước 3: Image-based, Image File, hoặc PDF có hình → Gemini Vision (đọc cả hình vẽ, công thức)
+        if use_gemini:
+            print(f"[ANALYZE] Image/PDF có hình/Ít text → Gemini Vision...", flush=True)
             gemini_key = os.environ.get("GEMINI_API_KEY", "").strip()
             if not gemini_key:
                 raise HTTPException(
                     status_code=400,
                     detail=(
-                        "PDF này là file ảnh (không có text layer). "
-                        "Cần cấu hình GEMINI_API_KEY trên Railway để đọc loại PDF này."
+                        "File này yêu cầu đọc ảnh. "
+                        "Cần cấu hình GEMINI_API_KEY trên Railway."
                     ),
                 )
             try:
                 import fitz
                 import base64 as _b64
 
-                doc = fitz.open(stream=raw, filetype="pdf")
+                filetype = "pdf" if is_pdf else media_type.split("/")[-1]
+                if filetype == "jpeg":
+                    filetype = "jpg"
+                doc = fitz.open(stream=raw, filetype=filetype)
                 parts = []
                 for page in doc:
                     mat = fitz.Matrix(2.0, 2.0)
@@ -353,14 +359,22 @@ def analyze_exam_file(
                                 page = doc[page_idx]
                                 rect = page.rect
                                 ymin, xmin, ymax, xmax = bbox
-                                p_xmin = (xmin / 1000.0) * rect.width
-                                p_ymin = (ymin / 1000.0) * rect.height
-                                p_xmax = (xmax / 1000.0) * rect.width
-                                p_ymax = (ymax / 1000.0) * rect.height
-                                
-                                clip_rect = fitz.Rect(p_xmin, p_ymin, p_xmax, p_ymax)
-                                mat = fitz.Matrix(3.0, 3.0)  # Higher resolution for cropped image
-                                pix = page.get_pixmap(matrix=mat, clip=clip_rect, colorspace=fitz.csRGB)
+                                # Đảm bảo toạ độ trong khoảng 0-1000
+                                ymin = max(0, min(1000, ymin))
+                                xmin = max(0, min(1000, xmin))
+                                ymax = max(0, min(1000, ymax))
+                                xmax = max(0, min(1000, xmax))
+
+                                if xmax > xmin and ymax > ymin:
+                                    # Thêm padding 15 pixels để cắt rộng ra
+                                    p_xmin = max(0, (xmin / 1000.0) * rect.width - 15)
+                                    p_ymin = max(0, (ymin / 1000.0) * rect.height - 15)
+                                    p_xmax = min(rect.width, (xmax / 1000.0) * rect.width + 15)
+                                    p_ymax = min(rect.height, (ymax / 1000.0) * rect.height + 15)
+                                    
+                                    clip_rect = fitz.Rect(p_xmin, p_ymin, p_xmax, p_ymax)
+                                    mat = fitz.Matrix(3.0, 3.0)  # Higher resolution for cropped image
+                                    pix = page.get_pixmap(matrix=mat, clip=clip_rect, colorspace=fitz.csRGB)
                                 img_bytes = pix.tobytes("png")
                                 figure_image_b64 = "data:image/png;base64," + _b64.b64encode(img_bytes).decode()
                         except Exception as e:
