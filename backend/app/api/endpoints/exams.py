@@ -22,20 +22,17 @@ Với mỗi câu hỏi, trả về:
   "correct_answer": "A"/"B"/"C"/"D"/"true"/"false" hoặc null nếu essay hoặc không rõ,
   "difficulty": "easy" | "medium" | "hard",
   "category": "Đại số" | "Hình học" | "Số học" | "Giải tích" | "Tổ hợp" | "Vật lý" | "Hóa học" | "Sinh học" | "Lịch sử" | "Địa lý" | "Tiếng Anh" | "Văn học" | "Tổng hợp",
-  "solution": "Lời giải/đáp án nếu có trong tài liệu, null nếu không có"
+  "solution": "Lời giải/đáp án nếu có trong tài liệu, null nếu không có",
+  "figure_bbox": [ymin, xmin, ymax, xmax] (Tọa độ chuẩn hóa 0-1000 của HÌNH VẼ MINH HỌA nếu có, null nếu không có hình),
+  "page_index": số nguyên chỉ mục trang (0-based) chứa hình vẽ (chỉ cần nếu có hình, mặc định 0)
 }
 
 QUY TẮC ĐỊNH DẠNG (BẮT BUỘC):
+- GỘP Ý PHỤ: NẾU CÂU HỎI CÓ CÁC Ý PHỤ (ví dụ: 1a, 1b, 1c): NGHIÊM CẤM tách thành các câu hỏi riêng biệt. Hãy gộp tất cả nội dung các ý phụ vào thuộc tính `description` của câu hỏi gốc (Câu 1).
+- CẮT HÌNH MINH HỌA: Nếu đề thi có biểu đồ, đồ thị, hình học, hãy khoanh vùng vị trí hình vẽ đó và trả về `figure_bbox` là mảng 4 số nguyên `[ymin, xmin, ymax, xmax]` theo tỷ lệ phần nghìn (0-1000) đối với kích thước trang. Kèm theo `page_index` (0-based) của trang chứa hình vẽ. Nếu không có hình, trả về null.
 - Công thức toán học: Sử dụng $...$ cho inline và $$...$$ cho block.
 - Bảng số liệu: Sử dụng định dạng Markdown Table chuẩn. 
-- HÌNH VẼ (figure_json): Nếu đề thi có hình vẽ minh họa, hãy trích xuất cấu trúc hình học cơ bản:
-  {
-    "viewBox": "0 0 400 300",
-    "elements": [
-      {"type": "point", "x": 100, "y": 100, "label": "A"},
-      {"type": "line", "start": [100, 100], "end": [200, 100], "dashed": false}
-    ]
-  }
+- HÌNH VẼ (figure_json): Bạn vẫn có thể trích xuất cấu trúc hình học cơ bản vào `figure_json` như cũ.
 - Bảng biến thiên/Bảng phức tạp: Sử dụng môi trường LaTeX \\begin{array} ... \\end{array}.
 - LUÔN để một dòng trống trước và sau các khối bảng/toán học.
 - Trả về DUY NHẤT một mảng JSON hợp lệ. KHÔNG có text nào khác ngoài JSON.
@@ -90,6 +87,9 @@ class ExtractedQuestion(BaseModel):
     category: str = "Tổng hợp"
     solution: Optional[str] = None
     figure_json: Optional[Dict] = None
+    figure_bbox: Optional[List[int]] = None
+    page_index: int = 0
+    figure_image: Optional[str] = None
 
 
 class ExamFromQuestions(BaseModel):
@@ -304,7 +304,7 @@ def analyze_exam_file(
                     img_bytes = pix.tobytes("png")
                     b64 = _b64.b64encode(img_bytes).decode()
                     parts.append({"inline_data": {"mime_type": "image/png", "data": b64}})
-                doc.close()
+                
                 parts.append({
                     "text": (
                         "Đây là đề thi. Trích xuất TẤT CẢ câu hỏi và trả về mảng JSON theo định dạng đã yêu cầu. "
@@ -337,6 +337,29 @@ def analyze_exam_file(
 
                 normalised = []
                 for i, q in enumerate(questions):
+                    figure_image_b64 = None
+                    bbox = q.get("figure_bbox")
+                    page_idx = q.get("page_index", 0)
+                    
+                    if bbox and isinstance(bbox, list) and len(bbox) == 4:
+                        try:
+                            if 0 <= page_idx < len(doc):
+                                page = doc[page_idx]
+                                rect = page.rect
+                                ymin, xmin, ymax, xmax = bbox
+                                p_xmin = (xmin / 1000.0) * rect.width
+                                p_ymin = (ymin / 1000.0) * rect.height
+                                p_xmax = (xmax / 1000.0) * rect.width
+                                p_ymax = (ymax / 1000.0) * rect.height
+                                
+                                clip_rect = fitz.Rect(p_xmin, p_ymin, p_xmax, p_ymax)
+                                mat = fitz.Matrix(3.0, 3.0)  # Higher resolution for cropped image
+                                pix = page.get_pixmap(matrix=mat, clip=clip_rect, colorspace=fitz.csRGB)
+                                img_bytes = pix.tobytes("png")
+                                figure_image_b64 = "data:image/png;base64," + _b64.b64encode(img_bytes).decode()
+                        except Exception as e:
+                            print(f"[ANALYZE] Lỗi crop hình cho câu {i+1}: {e}", flush=True)
+
                     normalised.append({
                         "title": q.get("title") or f"Câu {i + 1}",
                         "description": q.get("description", ""),
@@ -346,7 +369,11 @@ def analyze_exam_file(
                         "difficulty": q.get("difficulty", "medium"),
                         "category": q.get("category", "Tổng hợp"),
                         "solution": q.get("solution"),
+                        "figure_json": q.get("figure_json"),
+                        "figure_image": figure_image_b64,
                     })
+                
+                doc.close()
                 return {"questions": normalised, "count": len(normalised)}
 
             except HTTPException:
@@ -452,6 +479,7 @@ def create_exam_from_questions(
                 "correct_answer": q.correct_answer,
                 "solution": q.solution,
                 "figure_json": q.figure_json,
+                "figure_image": q.figure_image,
                 "example_input": "",
                 "example_output": "",
                 "test_cases": [],
