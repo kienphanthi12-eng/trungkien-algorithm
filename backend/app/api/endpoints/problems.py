@@ -281,6 +281,31 @@ async def generate_problems_bulk(body: BulkGenerateRequest, current_user = Depen
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Lỗi khi tạo hàng loạt: {str(e)}")
 
+class FigurePreviewRequest(BaseModel):
+    description: str
+
+
+@router.post("/generate-figure-preview")
+async def generate_figure_preview(
+    body: FigurePreviewRequest,
+    current_user=Depends(get_current_teacher),
+):
+    """
+    Sinh hình vẽ AI từ mô tả, trả về base64 KHÔNG lưu DB.
+    Dùng cho màn hình AnalyzeExam để preview trước khi lưu đề.
+    """
+    from app.services import figure_generator
+
+    if not body.description.strip():
+        raise HTTPException(status_code=400, detail="Vui lòng cung cấp mô tả câu hỏi.")
+    try:
+        img_b64 = await asyncio.to_thread(figure_generator.generate_and_render, body.description.strip())
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Lỗi sinh hình vẽ: {e}")
+
+    return {"figure_image": img_b64}
+
+
 @router.post("/{problem_id}/generate-figure")
 async def generate_problem_figure(
     problem_id: UUID,

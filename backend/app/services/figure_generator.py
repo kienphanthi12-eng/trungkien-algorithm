@@ -8,9 +8,11 @@ LLM phụ:   Gemini (fallback nếu DeepSeek không có key)
 import os
 import json
 import httpx
+import asyncio
 from typing import Optional
 
 from app.services import sandbox_executor
+from app.services.llm_proxy import LLMProxy
 
 FIGURE_CODE_PROMPT = """\
 Bạn là chuyên gia vẽ hình toán học Việt Nam bằng Python Matplotlib.
@@ -113,99 +115,43 @@ QUY TẮC BẮT BUỘC:
 """
 
 
-def _call_deepseek(description: str, hint: str) -> str:
-    """Gọi DeepSeek sinh Matplotlib code. Raise nếu thất bại."""
-    api_key = os.environ.get("DEEPSEEK_API_KEY", "")
-    if not api_key:
-        raise RuntimeError("DEEPSEEK_API_KEY chưa được cấu hình.")
-
-    user_msg = f"Bài toán:\n{description}"
-    if hint:
-        user_msg += f"\n\nMô tả hình cần vẽ:\n{hint}"
-    user_msg += "\n\nViết Matplotlib code vẽ hình này. Chỉ code Python thuần."
-
-    resp = httpx.post(
-        "https://api.deepseek.com/chat/completions",
-        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-        json={
-            "model": "deepseek-chat",
-            "messages": [
-                {"role": "system", "content": FIGURE_CODE_PROMPT},
-                {"role": "user", "content": user_msg},
-            ],
-            "temperature": 0.1,
-            "max_tokens": 3000,
-        },
-        timeout=90.0,
-    )
-    resp.raise_for_status()
-    code = resp.json()["choices"][0]["message"]["content"].strip()
-    # Strip markdown fences nếu model vẫn bọc code
-    if code.startswith("```"):
-        code = code.split("```")[1]
-        if code.startswith("python"):
-            code = code[6:]
-        code = code.rstrip("`").strip()
-    return code
-
-
-def _call_gemini(description: str, hint: str) -> str:
-    """Gọi Gemini sinh Matplotlib code. Raise nếu thất bại."""
-    api_key = os.environ.get("GEMINI_API_KEY", "")
-    if not api_key:
-        raise RuntimeError("GEMINI_API_KEY chưa được cấu hình.")
-
-    user_msg = f"Bài toán:\n{description}"
-    if hint:
-        user_msg += f"\n\nMô tả hình:\n{hint}"
-    user_msg += "\n\nViết Matplotlib code. Chỉ code Python thuần."
-
-    resp = httpx.post(
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
-        f"?key={api_key}",
-        json={
-            "contents": [{"parts": [{"text": FIGURE_CODE_PROMPT}, {"text": user_msg}]}],
-            "generationConfig": {"temperature": 0.1, "maxOutputTokens": 4096},
-        },
-        timeout=90.0,
-        headers={"Content-Type": "application/json"},
-    )
-    resp.raise_for_status()
-    code = resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
-    if code.startswith("```"):
-        code = code.split("```")[1]
-        if code.startswith("python"):
-            code = code[6:]
-        code = code.rstrip("`").strip()
-    return code
-
-
 def generate_figure_code(problem_description: str, figure_hint: str = "") -> str:
     """
     Sinh Matplotlib code từ mô tả bài toán.
-    Thử DeepSeek trước, fallback sang Gemini.
-    Raise RuntimeError với lý do cụ thể nếu cả hai đều thất bại.
+    Thử DeepSeek trước, fallback sang Gemini thông qua LLMProxy.
+    Raise RuntimeError với lý do cụ thể nếu thất bại.
     """
-    errors = []
+    user_msg = f"Bài toán:\n{problem_description}"
+    if figure_hint:
+        user_msg += f"\n\nMô tả hình cần vẽ:\n{figure_hint}"
+    user_msg += "\n\nViết Matplotlib code vẽ hình này. Chỉ code Python thuần."
 
-    # Ưu tiên DeepSeek (text model, đáng tin cậy hơn cho code)
-    if os.environ.get("DEEPSEEK_API_KEY"):
-        try:
-            return _call_deepseek(problem_description, figure_hint)
-        except Exception as e:
-            errors.append(f"DeepSeek: {e}")
+    messages = [
+        {"role": "system", "content": FIGURE_CODE_PROMPT},
+        {"role": "user", "content": user_msg},
+    ]
 
-    # Fallback sang Gemini
-    if os.environ.get("GEMINI_API_KEY"):
-        try:
-            return _call_gemini(problem_description, figure_hint)
-        except Exception as e:
-            errors.append(f"Gemini: {e}")
-
-    raise RuntimeError(
-        "Không thể gọi LLM để sinh code. "
-        + (" | ".join(errors) if errors else "Chưa cấu hình DEEPSEEK_API_KEY hoặc GEMINI_API_KEY.")
-    )
+    try:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        response = loop.run_until_complete(LLMProxy.chat_completion(
+            messages=messages,
+            temperature=0.1,
+            max_tokens=3000,
+            model_preference=["deepseek-chat", "gemini-1.5-flash"]
+        ))
+        loop.close()
+        
+        code = response["content"].strip()
+        # Strip markdown fences nếu model vẫn bọc code
+        if code.startswith("```"):
+            code = code.split("```")[1]
+            if code.startswith("python"):
+                code = code[6:]
+            code = code.rstrip("`").strip()
+        return code
+    except Exception as e:
+        raise RuntimeError(f"Không thể gọi LLM để sinh code: {e}")
 
 
 def generate_and_render(problem_description: str, figure_hint: str = "") -> str:

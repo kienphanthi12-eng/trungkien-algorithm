@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { createProblem, updateProblem, getProblem, generateProblem, generateProblemsBulk } from '../services/api';
+import { createProblem, updateProblem, getProblem, generateProblem, generateProblemsBulk, generateFigurePreview, generateProblemFigure } from '../services/api';
 
 export default function CreateProblem() {
   const { user, token } = useAuth();
@@ -46,6 +46,11 @@ export default function CreateProblem() {
   const [smartLoading, setSmartLoading] = useState(false);
   const [smartError, setSmartError] = useState('');
 
+  // Figure state
+  const [figureImage, setFigureImage] = useState(null);
+  const [generatingFigure, setGeneratingFigure] = useState(false);
+  const [figureError, setFigureError] = useState('');
+
   useEffect(() => {
     if (isEdit) loadProblem();
   }, [problemId]);
@@ -60,6 +65,7 @@ export default function CreateProblem() {
         solution: data.solution || '',
         test_cases: data.test_cases?.length ? data.test_cases : [{ input: '', output: '' }],
       });
+      setFigureImage(data.figure_image || null);
     } catch (err) {
       setError(err.message);
     }
@@ -184,10 +190,10 @@ export default function CreateProblem() {
       }
 
       if (isEdit) {
-        await updateProblem(token, problemId, payload);
+        await updateProblem(token, problemId, { ...payload, figure_image: figureImage });
         setSuccess('Cập nhật thành công!');
       } else {
-        await createProblem(token, payload);
+        await createProblem(token, { ...payload, figure_image: figureImage });
         setSuccess('Tạo bài toán thành công!');
       }
       setTimeout(() => navigate('/problems'), 1500);
@@ -199,6 +205,37 @@ export default function CreateProblem() {
   };
 
   const typeLabel = { multiple_choice: 'Trắc nghiệm', true_false: 'Đúng / Sai', trivia: 'Đố vui', essay: 'Tự luận', algorithm: 'Lập trình' };
+
+  const handleGenerateFigureForm = async () => {
+    if (!formData.description.trim()) {
+      setFigureError('Vui lòng nhập nội dung đề bài trước.');
+      return;
+    }
+    setGeneratingFigure(true);
+    setFigureError('');
+    try {
+      if (isEdit) {
+        // Đã có problem_id: gọi trực tiếp endpoint sinh + lưu DB
+        const res = await generateProblemFigure(token, problemId);
+        setFigureImage(res.figure_image);
+      } else {
+        // Chưa lưu: chỉ preview
+        const res = await generateFigurePreview(token, formData.description);
+        setFigureImage(res.figure_image);
+      }
+    } catch (err) {
+      setFigureError(err.message);
+    } finally {
+      setGeneratingFigure(false);
+    }
+  };
+
+  const handleFigureFileForm = (file) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => setFigureImage(e.target.result);
+    reader.readAsDataURL(file);
+  };
 
   return (
     <>
@@ -333,6 +370,50 @@ export default function CreateProblem() {
                     placeholder="Giải thích đáp án (chỉ giáo viên thấy)..." />
                 </div>
               )}
+
+              {/* Hình minh hoạ */}
+              <div className="pb-6 border-b border-gray-200">
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-sm font-medium text-gray-700">Hình minh hoạ (tùy chọn)</label>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={handleGenerateFigureForm}
+                      disabled={generatingFigure || !formData.description.trim()}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-600 text-white text-xs font-bold rounded-lg hover:bg-violet-700 disabled:opacity-50 transition-colors"
+                    >
+                      {generatingFigure ? (
+                        <>
+                          <svg className="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                          </svg>
+                          Đang sinh hình...
+                        </>
+                      ) : '🎨 Sinh hình AI'}
+                    </button>
+                    <label className="flex items-center gap-1 px-3 py-1.5 bg-gray-100 text-gray-700 text-xs font-bold rounded-lg hover:bg-gray-200 cursor-pointer transition-colors">
+                      📎 Tải ảnh lên
+                      <input type="file" accept="image/*" className="hidden"
+                        onChange={e => { if (e.target.files[0]) handleFigureFileForm(e.target.files[0]); }} />
+                    </label>
+                    {figureImage && (
+                      <button type="button" onClick={() => setFigureImage(null)}
+                        className="px-3 py-1.5 bg-red-50 text-red-500 text-xs font-bold rounded-lg hover:bg-red-100 transition-colors">
+                        🗑 Xóa
+                      </button>
+                    )}
+                  </div>
+                </div>
+                {figureError && <p className="text-xs text-red-600 mb-2">{figureError}</p>}
+                {figureImage ? (
+                  <img src={figureImage} alt="Hình minh hoạ" className="max-w-full h-auto max-h-80 rounded-lg border border-gray-200 shadow-sm" />
+                ) : (
+                  <div className="border-2 border-dashed border-gray-200 rounded-lg p-8 text-center text-gray-400 text-sm">
+                    Chưa có hình. Nhấn "🎨 Sinh hình AI" (cần có nội dung đề bài) hoặc "📎 Tải ảnh lên".
+                  </div>
+                )}
+              </div>
 
               {!isObjective && !isEssay && (
                 <>

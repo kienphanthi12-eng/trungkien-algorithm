@@ -22,20 +22,17 @@ Với mỗi câu hỏi, trả về:
   "correct_answer": "A"/"B"/"C"/"D"/"true"/"false" hoặc null nếu essay hoặc không rõ,
   "difficulty": "easy" | "medium" | "hard",
   "category": "Đại số" | "Hình học" | "Số học" | "Giải tích" | "Tổ hợp" | "Vật lý" | "Hóa học" | "Sinh học" | "Lịch sử" | "Địa lý" | "Tiếng Anh" | "Văn học" | "Tổng hợp",
-  "solution": "Lời giải/đáp án nếu có trong tài liệu, null nếu không có"
+  "solution": "Lời giải/đáp án nếu có trong tài liệu, null nếu không có",
+  "figure_bbox": [ymin, xmin, ymax, xmax] (Tọa độ chuẩn hóa 0-1000 của HÌNH VẼ MINH HỌA nếu có, null nếu không có hình),
+  "page_index": số nguyên chỉ mục trang (0-based) chứa hình vẽ (chỉ cần nếu có hình, mặc định 0)
 }
 
 QUY TẮC ĐỊNH DẠNG (BẮT BUỘC):
+- GỘP Ý PHỤ: NẾU CÂU HỎI CÓ CÁC Ý PHỤ (ví dụ: 1a, 1b, 1c): NGHIÊM CẤM tách thành các câu hỏi riêng biệt. Hãy gộp tất cả nội dung các ý phụ vào thuộc tính `description` của câu hỏi gốc (Câu 1).
+- CẮT HÌNH MINH HỌA: Nếu đề thi có biểu đồ, đồ thị, hình học, hãy khoanh vùng vị trí hình vẽ đó và trả về `figure_bbox` là mảng 4 số nguyên `[ymin, xmin, ymax, xmax]` theo tỷ lệ phần nghìn (0-1000) đối với kích thước trang. Kèm theo `page_index` (0-based) của trang chứa hình vẽ. Nếu không có hình, trả về null.
 - Công thức toán học: Sử dụng $...$ cho inline và $$...$$ cho block.
 - Bảng số liệu: Sử dụng định dạng Markdown Table chuẩn. 
-- HÌNH VẼ (figure_json): Nếu đề thi có hình vẽ minh họa, hãy trích xuất cấu trúc hình học cơ bản:
-  {
-    "viewBox": "0 0 400 300",
-    "elements": [
-      {"type": "point", "x": 100, "y": 100, "label": "A"},
-      {"type": "line", "start": [100, 100], "end": [200, 100], "dashed": false}
-    ]
-  }
+- HÌNH VẼ (figure_json): Bạn vẫn có thể trích xuất cấu trúc hình học cơ bản vào `figure_json` như cũ.
 - Bảng biến thiên/Bảng phức tạp: Sử dụng môi trường LaTeX \\begin{array} ... \\end{array}.
 - LUÔN để một dòng trống trước và sau các khối bảng/toán học.
 - Trả về DUY NHẤT một mảng JSON hợp lệ. KHÔNG có text nào khác ngoài JSON.
@@ -55,16 +52,19 @@ BƯỚC 3 — TẠO PHƯƠNG ÁN NHIỄU (chỉ MCQ):
 - 3 phương án sai = kết quả của 3 lỗi tư duy phổ biến (sai dấu, nhầm công thức, sai bước trung gian).
 - Phương án nhiễu phải KHÁC với correct_answer.
 
-BƯỚC 4 — KIỂM TRA BẮT BUỘC trước khi output:
-□ MCQ: Thử từng đáp án A,B,C,D — xác nhận CHỈ ĐÚNG MỘT. Nếu có 2 đáp án đúng → chọn lại số liệu khác.
-□ Đúng/Sai: Mỗi mệnh đề phải có giá trị Đúng/Sai rõ ràng, không mơ hồ.
-□ Nhất quán: Các dữ kiện trong câu không mâu thuẫn (điểm trên đồ thị, tọa độ, bảng số liệu).
-□ TXĐ đúng: Hàm số/phương trình phải có miền xác định phù hợp với dữ kiện đã cho.
-□ HÌNH VẼ: Nếu đề gốc có figure_json, hãy cập nhật tọa độ các điểm trong figure_json để khớp với dữ kiện mới trong câu hỏi.
+BƯỚC 4 — KIỂM TRA BẮT BUỘC NGUYÊN TẮC TOÁN HỌC (Validation):
+- ĐIỀU KIỆN XÁC ĐỊNH: Phải đảm bảo MẪU SỐ KHÁC 0. 
+- Biểu thức trong căn bậc chẵn (căn bậc 2, 4) PHẢI KHÔNG ÂM (>=0).
+- Biểu thức trong logarit PHẢI DƯƠNG (>0), cơ số dương và khác 1.
+- HÌNH HỌC: Độ dài các cạnh phải lớn hơn 0 và tuân thủ Bất đẳng thức tam giác. Giá trị lượng giác (sin, cos) phải thuộc [-1, 1].
+- MCQ: Thử từng đáp án A,B,C,D — xác nhận CHỈ ĐÚNG MỘT. 
+
+Để đảm bảo bạn không làm sai, bạn PHẢI THÊM trường "math_validation" vào output JSON để tự xác nhận điều kiện (VD: "Đã kiểm tra mẫu số x-2 khác 0 với các đáp án, tam giác thoả mãn BĐT").
 
 ĐỊNH DẠNG OUTPUT — chỉ trả về mảng JSON, không kèm text nào khác:
 [
   {
+    "original_id": "Mã ID của câu hỏi gốc (giữ nguyên không đổi)",
     "title": "Câu X",
     "description": "Nội dung câu hỏi. Dùng $...$ cho công thức inline, $$...$$ cho công thức riêng dòng. Bảng biến thiên/số liệu dùng Markdown table (| col |).",
     "problem_type": "multiple_choice | true_false | essay",
@@ -73,6 +73,7 @@ BƯỚC 4 — KIỂM TRA BẮT BUỘC trước khi output:
     "difficulty": "easy | medium | hard",
     "category": "giữ nguyên category gốc",
     "solution": "Lời giải từng bước đầy đủ, dùng LaTeX cho công thức. Phải chứng minh tại sao correct_answer đúng VÀ tại sao các đáp án còn lại sai.",
+    "math_validation": "Chuỗi tự xác nhận bạn đã kiểm tra điều kiện xác định",
     "figure_json": { "viewBox": "0 0 400 300", "elements": [...] }
   }
 ]"""
@@ -90,6 +91,11 @@ class ExtractedQuestion(BaseModel):
     category: str = "Tổng hợp"
     solution: Optional[str] = None
     figure_json: Optional[Dict] = None
+    figure_bbox: Optional[List[int]] = None
+    page_index: int = 0
+    figure_image: Optional[str] = None
+    original_id: Optional[str] = None
+    math_validation: Optional[str] = None
 
 
 class ExamFromQuestions(BaseModel):
@@ -229,74 +235,80 @@ def analyze_exam_file(
         import io as _io
         import re as _re
 
-        # ── Chỉ hỗ trợ PDF có text layer (deepseek-chat là text-only) ─────
-        if media_type != "application/pdf":
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    "DeepSeek chỉ hỗ trợ PDF có text layer, không phân tích được ảnh trực tiếp. "
-                    "Vui lòng tải lên file PDF (xuất từ Word/Google Docs)."
-                ),
-            )
-
-        # ── Trích xuất text: thử pypdf trước, fallback PyMuPDF ───────────
+        is_pdf = media_type == "application/pdf"
         extracted_text = ""
+        words = []
+        has_images = False
 
-        # Bước 1: pypdf
-        try:
-            import pypdf as _pypdf
-            reader = _pypdf.PdfReader(_io.BytesIO(raw))
-            pages_text = []
-            for page in reader.pages:
-                t = page.extract_text() or ""
-                if t.strip():
-                    pages_text.append(t)
-            extracted_text = "\n\n".join(pages_text).strip()
-            print(f"[ANALYZE] pypdf: {len(reader.pages)} trang, {len(extracted_text)} ký tự", flush=True)
-        except Exception as e:
-            print(f"[ANALYZE] pypdf lỗi: {e}", flush=True)
+        if is_pdf:
+            # ── Trích xuất text: thử pypdf trước, fallback PyMuPDF ───────────
+            # Bước 1: pypdf
+            try:
+                import pypdf as _pypdf
+                reader = _pypdf.PdfReader(_io.BytesIO(raw))
+                pages_text = []
+                for page in reader.pages:
+                    t = page.extract_text() or ""
+                    if t.strip():
+                        pages_text.append(t)
+                extracted_text = "\n\n".join(pages_text).strip()
+                print(f"[ANALYZE] pypdf: {len(reader.pages)} trang, {len(extracted_text)} ký tự", flush=True)
+            except Exception as e:
+                print(f"[ANALYZE] pypdf lỗi: {e}", flush=True)
 
-        # Bước 2: nếu pypdf cho ít text → thử PyMuPDF (tốt hơn với font đặc biệt, MathType, v.v.)
-        words = _re.findall(r'[a-zA-ZÀ-ỹ\d]{2,}', extracted_text)
-        if len(words) < 20:
-            print(f"[ANALYZE] pypdf kém ({len(words)} từ) → thử PyMuPDF...", flush=True)
+            # Bước 2: nếu pypdf cho ít text → thử PyMuPDF (tốt hơn với font đặc biệt, MathType, v.v.)
+            words = _re.findall(r'[a-zA-ZÀ-ỹ\d]{2,}', extracted_text)
             try:
                 import fitz  # PyMuPDF
                 doc = fitz.open(stream=raw, filetype="pdf")
-                pages_text = []
+                # Kiểm tra xem PDF có hình ảnh nào không
                 for page in doc:
-                    t = page.get_text("text") or ""
-                    if t.strip():
-                        pages_text.append(t)
-                fitz_text = "\n\n".join(pages_text).strip()
-                fitz_words = _re.findall(r'[a-zA-ZÀ-ỹ\d]{2,}', fitz_text)
-                print(f"[ANALYZE] PyMuPDF: {len(doc)} trang, {len(fitz_text)} ký tự, {len(fitz_words)} từ", flush=True)
-                if len(fitz_words) > len(words):
-                    extracted_text = fitz_text
-                    words = fitz_words
+                    if len(page.get_images()) > 0:
+                        has_images = True
+                        break
+                
+                if len(words) < 20:
+                    print(f"[ANALYZE] pypdf kém ({len(words)} từ) → thử PyMuPDF...", flush=True)
+                    pages_text = []
+                    for page in doc:
+                        t = page.get_text("text") or ""
+                        if t.strip():
+                            pages_text.append(t)
+                    fitz_text = "\n\n".join(pages_text).strip()
+                    fitz_words = _re.findall(r'[a-zA-ZÀ-ỹ\d]{2,}', fitz_text)
+                    print(f"[ANALYZE] PyMuPDF: {len(doc)} trang, {len(fitz_text)} ký tự, {len(fitz_words)} từ", flush=True)
+                    if len(fitz_words) > len(words):
+                        extracted_text = fitz_text
+                        words = fitz_words
                 doc.close()
             except ImportError:
                 print("[ANALYZE] PyMuPDF chưa cài", flush=True)
             except Exception as e:
                 print(f"[ANALYZE] PyMuPDF lỗi: {e}", flush=True)
 
-        # Bước 3: PDF image-based → Gemini Vision (đọc cả hình vẽ, công thức)
-        if len(words) < 20:
-            print(f"[ANALYZE] PDF image-based ({len(words)} từ) → Gemini Vision...", flush=True)
+        # Quyết định dùng model nào
+        use_gemini = (not is_pdf) or (len(words) < 20) or has_images
+
+        # Bước 3: Image-based, Image File, hoặc PDF có hình → Gemini Vision (đọc cả hình vẽ, công thức)
+        if use_gemini:
+            print(f"[ANALYZE] Image/PDF có hình/Ít text → Gemini Vision...", flush=True)
             gemini_key = os.environ.get("GEMINI_API_KEY", "").strip()
             if not gemini_key:
                 raise HTTPException(
                     status_code=400,
                     detail=(
-                        "PDF này là file ảnh (không có text layer). "
-                        "Cần cấu hình GEMINI_API_KEY trên Railway để đọc loại PDF này."
+                        "File này yêu cầu đọc ảnh. "
+                        "Cần cấu hình GEMINI_API_KEY trên Railway."
                     ),
                 )
             try:
                 import fitz
                 import base64 as _b64
 
-                doc = fitz.open(stream=raw, filetype="pdf")
+                filetype = "pdf" if is_pdf else media_type.split("/")[-1]
+                if filetype == "jpeg":
+                    filetype = "jpg"
+                doc = fitz.open(stream=raw, filetype=filetype)
                 parts = []
                 for page in doc:
                     mat = fitz.Matrix(2.0, 2.0)
@@ -304,7 +316,7 @@ def analyze_exam_file(
                     img_bytes = pix.tobytes("png")
                     b64 = _b64.b64encode(img_bytes).decode()
                     parts.append({"inline_data": {"mime_type": "image/png", "data": b64}})
-                doc.close()
+                
                 parts.append({
                     "text": (
                         "Đây là đề thi. Trích xuất TẤT CẢ câu hỏi và trả về mảng JSON theo định dạng đã yêu cầu. "
@@ -337,6 +349,37 @@ def analyze_exam_file(
 
                 normalised = []
                 for i, q in enumerate(questions):
+                    figure_image_b64 = None
+                    bbox = q.get("figure_bbox")
+                    page_idx = q.get("page_index", 0)
+                    
+                    if bbox and isinstance(bbox, list) and len(bbox) == 4:
+                        try:
+                            if 0 <= page_idx < len(doc):
+                                page = doc[page_idx]
+                                rect = page.rect
+                                ymin, xmin, ymax, xmax = bbox
+                                # Đảm bảo toạ độ trong khoảng 0-1000
+                                ymin = max(0, min(1000, ymin))
+                                xmin = max(0, min(1000, xmin))
+                                ymax = max(0, min(1000, ymax))
+                                xmax = max(0, min(1000, xmax))
+
+                                if xmax > xmin and ymax > ymin:
+                                    # Thêm padding 15 pixels để cắt rộng ra
+                                    p_xmin = max(0, (xmin / 1000.0) * rect.width - 15)
+                                    p_ymin = max(0, (ymin / 1000.0) * rect.height - 15)
+                                    p_xmax = min(rect.width, (xmax / 1000.0) * rect.width + 15)
+                                    p_ymax = min(rect.height, (ymax / 1000.0) * rect.height + 15)
+                                    
+                                    clip_rect = fitz.Rect(p_xmin, p_ymin, p_xmax, p_ymax)
+                                    mat = fitz.Matrix(3.0, 3.0)  # Higher resolution for cropped image
+                                    pix = page.get_pixmap(matrix=mat, clip=clip_rect, colorspace=fitz.csRGB)
+                                img_bytes = pix.tobytes("png")
+                                figure_image_b64 = "data:image/png;base64," + _b64.b64encode(img_bytes).decode()
+                        except Exception as e:
+                            print(f"[ANALYZE] Lỗi crop hình cho câu {i+1}: {e}", flush=True)
+
                     normalised.append({
                         "title": q.get("title") or f"Câu {i + 1}",
                         "description": q.get("description", ""),
@@ -346,7 +389,11 @@ def analyze_exam_file(
                         "difficulty": q.get("difficulty", "medium"),
                         "category": q.get("category", "Tổng hợp"),
                         "solution": q.get("solution"),
+                        "figure_json": q.get("figure_json"),
+                        "figure_image": figure_image_b64,
                     })
+                
+                doc.close()
                 return {"questions": normalised, "count": len(normalised)}
 
             except HTTPException:
@@ -452,6 +499,7 @@ def create_exam_from_questions(
                 "correct_answer": q.correct_answer,
                 "solution": q.solution,
                 "figure_json": q.figure_json,
+                "figure_image": q.figure_image,
                 "example_input": "",
                 "example_output": "",
                 "test_cases": [],
@@ -609,12 +657,15 @@ def generate_exam_variant(
     if not problems:
         raise HTTPException(status_code=400, detail="Đề thi này chưa có câu hỏi nào để tạo biến thể.")
 
-    # 2. Prepare questions for AI
+    # 2. Prepare questions for AI and map images
     source_questions = []
+    image_map = {}
     for ep in problems:
         p = ep.get("problem")
         if p:
+            prob_id = p.get("id")
             source_questions.append({
+                "original_id": prob_id,
                 "title": p.get("title"),
                 "description": p.get("description"),
                 "problem_type": p.get("problem_type"),
@@ -623,6 +674,11 @@ def generate_exam_variant(
                 "difficulty": p.get("difficulty"),
                 "category": p.get("category"),
             })
+            if prob_id:
+                image_map[prob_id] = {
+                    "figure_image": p.get("figure_image"),
+                    "figure_json": p.get("figure_json")
+                }
 
     # 3. Call DeepSeek AI — chia batch 5 câu để tránh bị cắt JSON
     api_key = os.environ.get("DEEPSEEK_API_KEY", "").strip()
@@ -684,6 +740,15 @@ def generate_exam_variant(
             new_questions_data.extend(variants)
         print(f"[VARIANT] ✅ Tổng {len(new_questions_data)} câu biến thể", flush=True)
 
+        # Re-attach images/json based on original_id
+        for q in new_questions_data:
+            orig_id = q.get("original_id")
+            if orig_id and orig_id in image_map:
+                if not q.get("figure_image"):
+                    q["figure_image"] = image_map[orig_id]["figure_image"]
+                # If LLM didn't return a new figure_json, keep the old one
+                if not q.get("figure_json"):
+                    q["figure_json"] = image_map[orig_id]["figure_json"]
 
         # 4. Create the new variant exam
         new_exam_data = ExamFromQuestions(
