@@ -144,9 +144,11 @@ def _enrich_exams(exams_data: list) -> list:
 
 
 def _parse_json_from_llm(text: str) -> list:
-    """Robustly parse JSON array from LLM response."""
+    """Robustly parse JSON array from LLM response, handling truncated tokens."""
+    import json
+    from fastapi import HTTPException
+    
     text = text.strip()
-    # Strip markdown code fences
     if "```" in text:
         parts = text.split("```")
         for part in parts:
@@ -156,12 +158,34 @@ def _parse_json_from_llm(text: str) -> list:
             if part.startswith("["):
                 text = part
                 break
-    # Find outermost JSON array
+                
     start = text.find("[")
-    end = text.rfind("]")
-    if start != -1 and end != -1 and end > start:
-        text = text[start:end + 1]
-    return json.loads(text)
+    if start != -1:
+        end = text.rfind("]")
+        try:
+            if end != -1 and end > start:
+                return json.loads(text[start:end + 1])
+            else:
+                return json.loads(text[start:])
+        except json.JSONDecodeError:
+            # AI output was likely truncated due to token limits.
+            # Salvage algorithm: find the last cleanly closed object "}," 
+            # and truncate the broken rest, then close the array.
+            salvaged = text[start:]
+            last_good_obj_end = salvaged.rfind("},")
+            if last_good_obj_end != -1:
+                try:
+                    return json.loads(salvaged[:last_good_obj_end + 1] + "]")
+                except json.JSONDecodeError:
+                    pass
+            
+            # If salvage totally fails, inform the user gracefully
+            raise HTTPException(
+                status_code=400, 
+                detail="Đề thi quá dài (vượt quá giới hạn của AI). Tuy nhiên hệ thống không thể khôi phục phần dữ liệu bị cắt đứt. Vui lòng chia nhỏ đề thi ra (khoảng 15-20 câu/lần) rồi thử lại."
+            )
+            
+    return []
 
 
 # ─── Routes ──────────────────────────────────────────────────────────────────────
