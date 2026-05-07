@@ -1,77 +1,46 @@
-# ZENTUS Platform
+# ZENTUS Platform - AI-Powered EdTech
 
-## Project Status
-- Phase 1: ✅ Complete (Auth - login/register/me)
-- Phase 2: ✅ Complete (Student Management)
-- Phase 3: ✅ Complete (Problem Management - CRUD operations)
-- Phase 4: ✅ Complete (Assignment Flow - create/list/detail assignments, Giao bài modal)
-- Phase 5: ✅ Complete (Submission & Grading - student submit, AI grading with Claude)
-- Phase 6: 🔲 Pending (LLM Proxy)
+## 🚀 Project Status
+- **Phase 1-5**: ✅ Complete (Auth, Students, Problems, Assignments, AI Grading)
+- **Phase 6**: ✅ Complete (AI Exam Analysis & Integration)
+- **Phase 7**: ✅ Complete (Exam Management & Geometry Editor - JSON/SVG)
+- **Phase 8**: ✅ Complete (Rebranding to ZENTUS & Glassmorphism UI)
+- **Phase 9**: ✅ Complete (Role-based Layout Refactor - Teacher Sidebar vs Student TopNav)
+- **Phase 10**: 🔲 Pending (Improved AI Variant Generation templates)
+- **Phase 11**: 🔲 Pending (Mobile Responsiveness optimization)
 
-## Tech Stack
-- Backend: Python FastAPI + Supabase
-- Frontend: Vite + React + TailwindCSS
-- Database: Supabase (Postgres)
-- Deploy: Railway (backend) + Vercel (frontend)
+## 🛠 Tech Stack
+- **Backend**: Python FastAPI + Supabase (PostgreSQL)
+- **Frontend**: Vite + React + TailwindCSS (Glassmorphism design)
+- **Icons & UI**: Lucide-React + Tailwind
+- **Math/Academic**: KaTeX (LaTeX) + React-Markdown
+- **Geometry**: SVG Renderer + JSON-based Figure Editor
+- **Deploy**: Railway (Backend) + Vercel (Frontend)
 
-## Production URLs
-- Backend: https://trungkien-algorithm-production.up.railway.app
-- Frontend: https://trungkien-algorithm-ejqs.vercel.app
-- Supabase: https://zabvdgnucfanvbjjgnic.supabase.co
+## 🌐 Production URLs
+- **Frontend**: https://trungkien-algorithm-ejqs.vercel.app
+- **Backend**: https://trungkien-algorithm-production.up.railway.app
+- **Database**: Supabase (Project: zabvdgnucfanvbjjgnic)
 
-## Local Development
-- Backend: uvicorn main:app --reload (port 8000)
-- Frontend: npm run dev (port 5173)
-- Backend path: backend/
-- Frontend path: frontend/
+## 💻 Local Development
+- **Backend**: `uvicorn main:app --reload` (Port 8000)
+- **Frontend**: `npm run dev` (Port 5173)
+- **Structure**: `backend/` and `frontend/` directories
 
-## Git Config
-- user.email: kienphanthi12@gmail.com
-- user.name: kienphanthi12-eng
+## 🏛 Architecture & Roles
+As of Phase 9, the app uses a unified codebase with role-based layouts:
+- **TeacherLayout**: Fixed sidebar navigation, management-heavy tools (Dashboard, Classrooms, Exams, Problems, Assignments).
+- **StudentLayout**: Clean top navigation, focus on learning and tasks (My Assignments, Exams, Problems).
+- **Route Guarding**: `TeacherRoute` component prevents students from accessing administrative paths.
 
-## Important Notes
-- RLS is DISABLED on public.users (fix in Phase 2+)
-- RLS is ENABLED on public.problems (Phase 3+)
-- Backend uses SERVICE_ROLE key (in Railway env vars)
-- Frontend uses ANON key (in Vercel env vars)
-- All API calls go through backend, never direct Supabase
-- Vietnamese UI throughout
+## 📝 Key Components
+- `ExamProblemView`: Academic-style rendering of problems (MCQ, T/F, Math).
+- `FigureEditor/Renderer`: Custom tool for creating and displaying geometric figures via JSON/SVG.
+- `MarkdownRenderer`: Unified component for LaTeX and Markdown support.
 
-## Phase 3 - Problem Management Implementation
-
-### Database Schema
-- Table: `public.problems`
-- Columns: id, title, description, difficulty, category, example_input, example_output, test_cases (JSONB), time_limit, memory_limit, created_by, created_at, updated_at
-- RLS Policies: Public read, Teachers only create, Creator can edit/delete
-
-### Backend Endpoints
-- `GET /problems` - List all problems (with pagination, filters)
-- `GET /problems/{id}` - Get problem details
-- `POST /problems` - Create problem (teacher only)
-- `PUT /problems/{id}` - Update problem (creator only)
-- `DELETE /problems/{id}` - Delete problem (creator only)
-
-### Frontend Pages
-- `/problems` - List all problems with pagination
-- `/problems/{id}` - View problem details
-- `/problems/create` - Create new problem (teacher only)
-- `/problems/{id}/edit` - Edit problem (creator only)
-
-### Files Added
-**Backend:**
-- `app/schemas/problems.py` - Pydantic models
-- `app/api/endpoints/problems.py` - API endpoints
-- `migrations/001_create_problems_table.sql` - Database migration
-
-**Frontend:**
-- `src/pages/Problems.jsx` - List page
-- `src/pages/ProblemDetail.jsx` - Detail page
-- `src/pages/CreateProblem.jsx` - Create/Edit page
-- Updated `src/services/api.js` - API client functions
-- Updated `src/App.jsx` - Routes
-
-### Next Steps for Phase 3
-1. Run database migration in Supabase
-2. Test all API endpoints
-3. Test frontend components
-4. Deploy to production
+## 🎯 Next Steps & Plans
+1. **AI Enhancement**: Optimize the prompts for "Tạo biến thể AI" to support more complex geometry templates.
+2. **Classroom Analytics**: Add charts/stats to the Teacher Dashboard to track student progress over time.
+3. **Real-time Notifications**: Notify students when a new assignment is assigned.
+4. **Mobile Polish**: Ensure the new sidebar and topnav work perfectly on tablets and phones.
+5. **Classroom Detail Improvement**: Add student performance summary within the Classroom Detail view.

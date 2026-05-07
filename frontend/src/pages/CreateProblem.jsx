@@ -40,6 +40,12 @@ export default function CreateProblem() {
   const [bulkResults, setBulkResults] = useState([]);
   const [saveLoading, setSaveLoading] = useState(false);
 
+  // Smart Paste state
+  const [showSmartPasteModal, setShowSmartPasteModal] = useState(false);
+  const [rawText, setRawText] = useState('');
+  const [smartLoading, setSmartLoading] = useState(false);
+  const [smartError, setSmartError] = useState('');
+
   useEffect(() => {
     if (isEdit) loadProblem();
   }, [problemId]);
@@ -117,6 +123,27 @@ export default function CreateProblem() {
     }
   };
 
+  const handleSmartPaste = async () => {
+    if (!rawText.trim()) { setSmartError('Vui lòng dán nội dung văn bản'); return; }
+    setSmartLoading(true);
+    setSmartError('');
+    try {
+      const prompt = `Bạn là một trợ lý giáo dục chuyên nghiệp. Hãy đọc đoạn văn bản thô (có thể bị copy lỗi định dạng) dưới đây. Bóc tách nó ra thành một bài toán hoàn chỉnh bao gồm Tiêu đề, Đề bài, 4 phương án A B C D (nếu là trắc nghiệm), Đáp án đúng (chữ cái A, B, C hoặc D), Lời giải chi tiết. Hãy format các công thức toán học bằng chuẩn LaTeX (ví dụ $x^2$). Văn bản thô cần bóc tách:\n\n${rawText}`;
+      const result = await generateProblem(token, prompt);
+      setFormData(prev => ({
+        ...prev,
+        ...result,
+        test_cases: result.test_cases || [{ input: '', output: '' }]
+      }));
+      setShowSmartPasteModal(false);
+      setRawText('');
+    } catch (err) {
+      setSmartError(err.message);
+    } finally {
+      setSmartLoading(false);
+    }
+  };
+
   const handleSaveBulk = async () => {
     setSaveLoading(true);
     try {
@@ -185,10 +212,16 @@ export default function CreateProblem() {
                 {isEdit ? 'Chỉnh sửa bài toán' : 'Tạo bài toán mới'}
               </h1>
               {!isEdit && (
-                <button type="button" onClick={() => { setShowAiModal(true); setAiError(''); setBulkResults([]); }}
-                  className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium text-sm shadow">
-                  <span>✨</span><span>Tạo bằng AI</span>
-                </button>
+                <div className="flex gap-3">
+                  <button type="button" onClick={() => { setShowSmartPasteModal(true); setSmartError(''); setRawText(''); }}
+                    className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium text-sm shadow transition-colors">
+                    <span>✂️</span><span>Bóc tách từ Text</span>
+                  </button>
+                  <button type="button" onClick={() => { setShowAiModal(true); setAiError(''); setBulkResults([]); }}
+                    className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium text-sm shadow transition-colors">
+                    <span>✨</span><span>Tạo bằng AI</span>
+                  </button>
+                </div>
               )}
             </div>
 
@@ -378,6 +411,59 @@ export default function CreateProblem() {
           </div>
         </div>
       </main>
+
+      {/* Smart Paste Modal */}
+      {showSmartPasteModal && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl p-8 transform transition-all">
+            <div className="flex items-center gap-3 mb-2">
+              <span className="text-3xl">✂️</span>
+              <h2 className="text-2xl font-black text-slate-900 tracking-tight">Bóc tách câu hỏi bằng AI</h2>
+            </div>
+            <p className="text-sm text-slate-500 mb-6">
+              Copy toàn bộ nội dung câu hỏi (từ Word, PDF...) và dán vào đây. AI của ZENTUS sẽ tự động phân tích và tự động điền vào các ô: Đề bài, Đáp án A B C D, và Lời giải.
+            </p>
+
+            <textarea 
+              value={rawText} 
+              onChange={(e) => setRawText(e.target.value)} 
+              rows="8" 
+              disabled={smartLoading}
+              className="w-full rounded-xl border border-slate-200 p-4 text-sm font-medium focus:outline-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 resize-none mb-4 bg-slate-50 placeholder-slate-400"
+              placeholder="Ví dụ:&#10;Câu 1. Phương trình x^2 - 1 = 0 có nghiệm là?&#10;A. x = 1&#10;B. x = -1&#10;C. x = +-1&#10;D. Vô nghiệm.&#10;Lời giải: Ta có x^2 = 1 => x = +-1. Chọn C." 
+            />
+
+            {smartError && (
+              <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm font-medium">
+                {smartError}
+              </div>
+            )}
+
+            <div className="flex justify-end gap-3 mt-2">
+              <button 
+                onClick={() => { setShowSmartPasteModal(false); setRawText(''); }} 
+                className="px-6 py-2.5 text-slate-600 hover:text-slate-900 font-bold rounded-xl hover:bg-slate-100 transition-colors"
+              >
+                Hủy
+              </button>
+              
+              <button 
+                onClick={handleSmartPaste} 
+                disabled={smartLoading || !rawText.trim()}
+                className="px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-blue-600 text-white rounded-xl font-bold shadow-lg shadow-indigo-200 hover:shadow-xl hover:scale-105 transition-all disabled:opacity-50 disabled:scale-100 flex items-center gap-2"
+              >
+                {smartLoading ? (
+                  <>
+                    <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                    Đang bóc tách...
+                  </>
+                ) : 'Bóc tách ngay'}
+              </button>
+            </div>
+            <p className="mt-4 text-[10px] font-bold text-slate-400 text-center tracking-widest uppercase">Powered by ZENTUS AI Engine</p>
+          </div>
+        </div>
+      )}
 
       {showAiModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
