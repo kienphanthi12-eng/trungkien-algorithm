@@ -394,7 +394,7 @@ export default function AnalyzeExam() {
             <h2 className="text-3xl font-black text-slate-900 mb-3">Đề thi đã được tạo!</h2>
             <p className="text-slate-500 mb-2">
               <span className="font-bold text-blue-600">{createdExam.title}</span> —{' '}
-              {createdExam.problems?.length || questions.length} câu hỏi — {examDuration} phút
+              {createdExam.problems?.length || 0} câu hỏi — {examDuration} phút
             </p>
             <p className="text-slate-400 text-sm mb-10">
               Tất cả câu hỏi đã được lưu vào ngân hàng bài toán và liên kết với đề thi.
