@@ -355,12 +355,25 @@ export default function AnalyzeExam() {
                 </div>
               </div>
 
-              <textarea
-                value={rawText}
-                onChange={e => setRawText(e.target.value)}
-                className="w-full h-[600px] p-6 border border-slate-300 rounded-2xl focus:outline-none focus:ring-4 focus:ring-blue-500/20 text-[15px] font-medium text-slate-800 bg-white leading-relaxed resize-y font-mono shadow-inner"
-                spellCheck={false}
-              />
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Khung gõ Raw Text */}
+                <textarea
+                  value={rawText}
+                  onChange={e => setRawText(e.target.value)}
+                  className="w-full h-[700px] p-6 border border-slate-300 rounded-2xl focus:outline-none focus:ring-4 focus:ring-blue-500/20 text-[14px] font-medium text-slate-800 bg-slate-50 leading-relaxed resize-none font-mono shadow-inner"
+                  spellCheck={false}
+                  placeholder="Nhập hoặc sửa nội dung ở đây..."
+                />
+                
+                {/* Khung Xem trước công thức Toán học KaTeX */}
+                <div className="w-full h-[700px] p-6 border border-slate-200 rounded-2xl bg-white overflow-y-auto prose prose-slate max-w-none shadow-sm">
+                  <div className="mb-4 pb-2 border-b border-slate-100 flex items-center gap-2">
+                    <span className="text-xl">👁️</span>
+                    <span className="font-bold text-slate-700">Xem trước (Live Preview)</span>
+                  </div>
+                  <MarkdownRenderer content={rawText} />
+                </div>
+              </div>
             </div>
 
             {/* Create button */}
