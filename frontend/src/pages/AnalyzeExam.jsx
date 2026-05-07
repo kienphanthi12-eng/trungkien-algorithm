@@ -5,6 +5,77 @@ import { analyzeExam, createExamFromQuestions, generateFigurePreview } from '../
 import MarkdownRenderer from '../components/MarkdownRenderer';
 import logo from '../assets/logo.png';
 
+// ── Helpers: Chuyển đổi JSON <-> Text ─────────────────────────────────────────
+function questionsToText(qs) {
+  return qs.map((q, i) => {
+    let t = `Câu ${i + 1}:\n`;
+    t += `[Mức độ: ${q.difficulty || 'medium'}] [Dạng: ${q.problem_type || 'multiple_choice'}] [Chủ đề: ${q.category || 'Tổng hợp'}]\n`;
+    t += `${q.description || ''}\n`;
+    if (q.problem_type === 'multiple_choice' && q.choices) {
+      t += `A. ${q.choices.A || ''}\n`;
+      t += `B. ${q.choices.B || ''}\n`;
+      t += `C. ${q.choices.C || ''}\n`;
+      t += `D. ${q.choices.D || ''}\n`;
+    }
+    if (q.correct_answer) t += `Đáp án đúng: ${q.correct_answer}\n`;
+    if (q.solution) t += `Lời giải: ${q.solution}\n`;
+    return t.trim();
+  }).join('\n\n--------------------------------------------------\n\n');
+}
+
+function textToQuestions(text) {
+  const blocks = text.split(/--------------------------------------------------/).map(b => b.trim()).filter(Boolean);
+  return blocks.map((block, idx) => {
+    const lines = block.split('\n');
+    const q = {
+      title: \`Câu \${idx + 1}\`, description: '', problem_type: 'multiple_choice',
+      difficulty: 'medium', category: 'Tổng hợp',
+      choices: { A: '', B: '', C: '', D: '' }, correct_answer: null, solution: null
+    };
+    
+    let currentField = 'description';
+    let descLines = [];
+    let solLines = [];
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) continue;
+      
+      if (i === 0 && line.match(/^Câu \d+[:.]?/i)) {
+        q.title = line;
+        continue;
+      }
+      
+      const metaMatch = line.match(/^\[Mức độ:\s*(.*?)\]\s*\[Dạng:\s*(.*?)\]\s*\[Chủ đề:\s*(.*?)\]/i);
+      if (metaMatch) {
+        q.difficulty = metaMatch[1]; q.problem_type = metaMatch[2]; q.category = metaMatch[3];
+        continue;
+      }
+      
+      if (line.match(/^A\.\s/i)) { q.choices.A = line.substring(3).trim(); currentField = 'A'; continue; }
+      if (line.match(/^B\.\s/i)) { q.choices.B = line.substring(3).trim(); currentField = 'B'; continue; }
+      if (line.match(/^C\.\s/i)) { q.choices.C = line.substring(3).trim(); currentField = 'C'; continue; }
+      if (line.match(/^D\.\s/i)) { q.choices.D = line.substring(3).trim(); currentField = 'D'; continue; }
+      
+      const ansMatch = line.match(/^Đáp án đúng:\s*(.*)/i);
+      if (ansMatch) { q.correct_answer = ansMatch[1].trim(); currentField = 'none'; continue; }
+      
+      const solMatch = line.match(/^Lời giải:\s*(.*)/i);
+      if (solMatch) { solLines.push(solMatch[1].trim()); currentField = 'solution'; continue; }
+
+      if (currentField === 'description') descLines.push(line);
+      else if (currentField === 'solution') solLines.push(line);
+      else if (['A','B','C','D'].includes(currentField)) q.choices[currentField] += '\n' + line;
+    }
+    
+    q.description = descLines.join('\n').trim();
+    q.solution = solLines.join('\n').trim() || null;
+    if (q.problem_type !== 'multiple_choice') q.choices = null;
+    
+    return q;
+  });
+}
+
 const DIFFICULTY_OPTIONS = ['easy', 'medium', 'hard'];
 const DIFFICULTY_LABELS = { easy: 'Dễ', medium: 'Trung bình', hard: 'Khó' };
 const TYPE_OPTIONS = ['multiple_choice', 'true_false', 'essay'];
@@ -26,9 +97,8 @@ export default function AnalyzeExam() {
   const [dragOver, setDragOver] = useState(false);
   const [analyzeError, setAnalyzeError] = useState('');
 
-  // Reviewed questions (editable)
-  const [questions, setQuestions] = useState([]);
-  const [expandedIdx, setExpandedIdx] = useState(null);
+  // Raw text editor state
+  const [rawText, setRawText] = useState('');
 
   // Exam meta
   const [examTitle, setExamTitle] = useState('');
@@ -37,7 +107,6 @@ export default function AnalyzeExam() {
 
   const [createError, setCreateError] = useState('');
   const [createdExam, setCreatedExam] = useState(null);
-  const [generatingFigureIdx, setGeneratingFigureIdx] = useState(null); // index of question generating figure
 
   // ── File handling ──────────────────────────────────────────────────────────
 
@@ -60,12 +129,9 @@ export default function AnalyzeExam() {
     setAnalyzeError('');
     try {
       const result = await analyzeExam(token, file);
-      const qs = (result.questions || []).map((q, i) => ({
-        ...q,
-        _id: i, // local key for React
-        choices: q.choices || { A: '', B: '', C: '', D: '' },
-      }));
-      setQuestions(qs);
+      // Chuyển JSON thành Text để đưa vào Editor
+      setRawText(questionsToText(result.questions || []));
+      
       // Suggest exam title from file name
       const base = file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
       setExamTitle(base || 'Đề thi mới');
@@ -76,67 +142,6 @@ export default function AnalyzeExam() {
     }
   };
 
-  // ── Question editing helpers ───────────────────────────────────────────────
-
-  const updateQuestion = (idx, field, value) => {
-    setQuestions(prev => prev.map((q, i) => i === idx ? { ...q, [field]: value } : q));
-  };
-
-  const updateChoice = (idx, key, value) => {
-    setQuestions(prev => prev.map((q, i) =>
-      i === idx ? { ...q, choices: { ...q.choices, [key]: value } } : q
-    ));
-  };
-
-  // Handler: sinh hình vẽ AI cho câu hỏi cưa chưa lưu
-  const handleGenerateFigure = async (idx) => {
-    const q = questions[idx];
-    if (!q?.description) return;
-    setGeneratingFigureIdx(idx);
-    try {
-      const res = await generateFigurePreview(token, q.description);
-      updateQuestion(idx, 'figure_image', res.figure_image);
-    } catch (err) {
-      alert('Lỗi sinh hình: ' + err.message);
-    } finally {
-      setGeneratingFigureIdx(null);
-    }
-  };
-
-  // Handler: thay ảnh bằng file upload
-  const handleFigureFileChange = (idx, file) => {
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (e) => updateQuestion(idx, 'figure_image', e.target.result);
-    reader.readAsDataURL(file);
-  };
-
-  // Handler: xóa hình
-  const handleRemoveFigure = (idx) => updateQuestion(idx, 'figure_image', null);
-
-  const removeQuestion = (idx) => {
-    setQuestions(prev => prev.filter((_, i) => i !== idx));
-    if (expandedIdx === idx) setExpandedIdx(null);
-    else if (expandedIdx > idx) setExpandedIdx(prev => prev - 1);
-  };
-
-  const addQuestion = () => {
-    const newQ = {
-      _id: Date.now(),
-      title: `Câu ${questions.length + 1}`,
-      description: '',
-      problem_type: 'multiple_choice',
-      choices: { A: '', B: '', C: '', D: '' },
-      correct_answer: null,
-      difficulty: 'medium',
-      category: 'Tổng hợp',
-      solution: null,
-      figure_image: null,
-    };
-    setQuestions(prev => [...prev, newQ]);
-    setExpandedIdx(questions.length);
-  };
-
   // ── Create exam ────────────────────────────────────────────────────────────
 
   const handleCreate = async () => {
@@ -144,23 +149,20 @@ export default function AnalyzeExam() {
       setCreateError('Vui lòng nhập tiêu đề đề thi.');
       return;
     }
-    if (questions.length === 0) {
-      setCreateError('Cần ít nhất 1 câu hỏi.');
-      return;
-    }
     setStep('creating');
     setCreateError('');
     try {
-      // Strip internal _id before sending
-      const payload = questions.map(({ _id, ...rest }) => ({
-        ...rest,
-        choices: rest.problem_type === 'multiple_choice' ? rest.choices : null,
-      }));
+      // Dịch ngược Text về JSON
+      const parsedQuestions = textToQuestions(rawText);
+      if (parsedQuestions.length === 0) {
+        throw new Error("Không tìm thấy cấu trúc câu hỏi nào. Vui lòng kiểm tra lại văn bản.");
+      }
+
       const exam = await createExamFromQuestions(token, {
         title: examTitle.trim(),
         description: examDesc.trim() || null,
         duration: Number(examDuration) || 60,
-        questions: payload,
+        questions: parsedQuestions,
       });
       setCreatedExam(exam);
       setStep('done');
@@ -340,270 +342,25 @@ export default function AnalyzeExam() {
               </div>
             </div>
 
-            {/* Questions list */}
+            {/* Raw Text Editor */}
             <div className="bg-white/70 backdrop-blur-xl rounded-3xl border border-white/40 shadow-xl p-8">
               <div className="flex justify-between items-center mb-6">
                 <div>
                   <h2 className="text-xl font-black text-slate-900">
-                    Câu hỏi trích xuất
-                    <span className="ml-2 text-sm font-bold px-3 py-1 bg-blue-50 text-blue-600 rounded-full border border-blue-100">
-                      {questions.length} câu
-                    </span>
+                    Trình soạn thảo đề thi
                   </h2>
-                  <p className="text-slate-400 text-sm mt-1">Click vào từng câu để chỉnh sửa. Có thể thêm/xóa câu hỏi.</p>
+                  <p className="text-slate-500 text-sm mt-1">
+                    Chỉnh sửa tự do như Word. Giữ nguyên các từ khóa như <code className="bg-slate-100 text-red-500 px-1 rounded">Câu...:</code>, <code className="bg-slate-100 text-red-500 px-1 rounded">A.</code>, <code className="bg-slate-100 text-red-500 px-1 rounded">Đáp án đúng:</code> để hệ thống nhận diện đúng cấu trúc.
+                  </p>
                 </div>
-                <button
-                  onClick={addQuestion}
-                  className="px-4 py-2 bg-slate-900 text-white text-sm font-bold rounded-xl hover:bg-slate-700 transition-colors"
-                >
-                  + Thêm câu
-                </button>
               </div>
 
-              {questions.length === 0 ? (
-                <div className="text-center py-12 text-slate-400">
-                  <p className="text-lg">Không có câu hỏi nào.</p>
-                  <button onClick={addQuestion} className="mt-3 text-blue-600 font-bold hover:underline text-sm">
-                    Thêm câu hỏi thủ công
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {questions.map((q, idx) => (
-                    <div key={q._id} className="border border-slate-200 rounded-2xl overflow-hidden">
-                      {/* Question header */}
-                      <div
-                        className="flex items-center gap-3 px-5 py-4 cursor-pointer hover:bg-slate-50 transition-colors"
-                        onClick={() => setExpandedIdx(expandedIdx === idx ? null : idx)}
-                      >
-                        <span className="w-7 h-7 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-black flex-shrink-0">
-                          {idx + 1}
-                        </span>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-bold text-slate-800 text-sm truncate">{q.title || `Câu ${idx + 1}`}</p>
-                          <div className="text-slate-400 text-xs truncate max-h-5 overflow-hidden">
-                            <MarkdownRenderer content={q.description || '(chưa có nội dung)'} />
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <span className={`text-xs font-bold px-2 py-0.5 rounded-full
-                            ${q.difficulty === 'easy' ? 'bg-green-100 text-green-600'
-                              : q.difficulty === 'hard' ? 'bg-red-100 text-red-600'
-                              : 'bg-yellow-100 text-yellow-600'}`}>
-                            {DIFFICULTY_LABELS[q.difficulty] || q.difficulty}
-                          </span>
-                          <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">
-                            {TYPE_LABELS[q.problem_type] || q.problem_type}
-                          </span>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); removeQuestion(idx); }}
-                            className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                          </button>
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            className={`h-4 w-4 text-slate-400 transition-transform ${expandedIdx === idx ? 'rotate-180' : ''}`}
-                            fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                          >
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                          </svg>
-                        </div>
-                      </div>
-
-                      {/* Expanded editor */}
-                      {expandedIdx === idx && (
-                        <div className="border-t border-slate-100 p-5 bg-slate-50/50 space-y-4">
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div className="md:col-span-1">
-                              <label className="block text-xs font-bold text-slate-600 mb-1">Tiêu đề câu</label>
-                              <input
-                                type="text"
-                                value={q.title}
-                                onChange={e => updateQuestion(idx, 'title', e.target.value)}
-                                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-xs font-bold text-slate-600 mb-1">Loại câu hỏi</label>
-                              <select
-                                value={q.problem_type}
-                                onChange={e => updateQuestion(idx, 'problem_type', e.target.value)}
-                                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                              >
-                                {TYPE_OPTIONS.map(t => (
-                                  <option key={t} value={t}>{TYPE_LABELS[t]}</option>
-                                ))}
-                              </select>
-                            </div>
-                            <div>
-                              <label className="block text-xs font-bold text-slate-600 mb-1">Độ khó</label>
-                              <select
-                                value={q.difficulty}
-                                onChange={e => updateQuestion(idx, 'difficulty', e.target.value)}
-                                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                              >
-                                {DIFFICULTY_OPTIONS.map(d => (
-                                  <option key={d} value={d}>{DIFFICULTY_LABELS[d]}</option>
-                                ))}
-                              </select>
-                            </div>
-                          </div>
-
-                          <div>
-                            <label className="block text-xs font-bold text-slate-600 mb-1">Nội dung câu hỏi</label>
-                            <textarea
-                              rows={3}
-                              value={q.description}
-                              onChange={e => updateQuestion(idx, 'description', e.target.value)}
-                              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white resize-none"
-                            />
-                            {q.description && (
-                              <div className="mt-2 p-3 bg-white border border-slate-100 rounded-lg shadow-inner overflow-x-auto">
-                                <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Xem trước (Preview):</p>
-                                <MarkdownRenderer content={q.description} />
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Hình minh hoạ — hiển thị, sinh AI, thay file */}
-                          <div className="border border-slate-200 rounded-xl p-4 bg-white">
-                            <div className="flex items-center justify-between mb-2">
-                              <label className="text-xs font-bold text-slate-600">Hình minh hoạ</label>
-                              <div className="flex items-center gap-2">
-                                <button
-                                  onClick={() => handleGenerateFigure(idx)}
-                                  disabled={generatingFigureIdx === idx || !q.description}
-                                  className="px-3 py-1.5 bg-purple-600 text-white text-xs font-bold rounded-lg hover:bg-purple-700 disabled:opacity-50 transition-colors flex items-center gap-1"
-                                >
-                                  {generatingFigureIdx === idx ? (
-                                    <>
-                                      <svg className="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                                      </svg>
-                                      Đang sinh hình…
-                                    </>
-                                  ) : '🎨 Sinh hình AI'}
-                                </button>
-                                <label className="px-3 py-1.5 bg-slate-100 text-slate-600 text-xs font-bold rounded-lg hover:bg-slate-200 cursor-pointer transition-colors">
-                                  📎 Thay ảnh
-                                  <input
-                                    type="file"
-                                    accept="image/*"
-                                    className="hidden"
-                                    onChange={e => { if (e.target.files[0]) handleFigureFileChange(idx, e.target.files[0]); }}
-                                  />
-                                </label>
-                                {q.figure_image && (
-                                  <button
-                                    onClick={() => handleRemoveFigure(idx)}
-                                    className="px-3 py-1.5 bg-red-50 text-red-500 text-xs font-bold rounded-lg hover:bg-red-100 transition-colors"
-                                  >
-                                    🗑 Xóa
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                            {q.figure_image ? (
-                              <img
-                                src={q.figure_image}
-                                alt="Hình minh hoạ"
-                                className="max-w-full h-auto rounded-lg border border-slate-100 shadow-sm"
-                              />
-                            ) : (
-                              <p className="text-xs text-slate-400 text-center py-4">
-                                Chưa có hình minh hoạ. Nhấn "🎨 Sinh hình AI" để AI tự vẽ, hoặc "📎 Thay ảnh" để tải lên.
-                              </p>
-                            )}
-                          </div>
-
-                          {/* MCQ choices */}
-                          {q.problem_type === 'multiple_choice' && (
-                            <div>
-                              <label className="block text-xs font-bold text-slate-600 mb-2">Đáp án lựa chọn</label>
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                {['A', 'B', 'C', 'D'].map(key => (
-                                  <div key={key} className="flex items-center gap-2">
-                                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-black flex-shrink-0
-                                      ${q.correct_answer === key ? 'bg-green-500 text-white' : 'bg-slate-200 text-slate-500'}`}>
-                                      {key}
-                                    </span>
-                                    <input
-                                      type="text"
-                                      value={q.choices?.[key] || ''}
-                                      onChange={e => updateChoice(idx, key, e.target.value)}
-                                      className="flex-1 border border-slate-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                                      placeholder={`Đáp án ${key}`}
-                                    />
-                                    <button
-                                      onClick={() => updateQuestion(idx, 'correct_answer', key)}
-                                      title="Đánh dấu đáp án đúng"
-                                      className={`p-1.5 rounded-lg transition-colors text-xs font-bold
-                                        ${q.correct_answer === key ? 'bg-green-100 text-green-600' : 'bg-slate-100 text-slate-400 hover:bg-green-50 hover:text-green-500'}`}
-                                    >
-                                      ✓
-                                    </button>
-                                  </div>
-                                ))}
-                              </div>
-                              {q.correct_answer && (
-                                <p className="mt-2 text-xs text-green-600 font-bold">Đáp án đúng: {q.correct_answer}</p>
-                              )}
-                            </div>
-                          )}
-
-                          {/* True/False */}
-                          {q.problem_type === 'true_false' && (
-                            <div>
-                              <label className="block text-xs font-bold text-slate-600 mb-2">Đáp án đúng/sai</label>
-                              <div className="flex gap-3">
-                                {['true', 'false'].map(val => (
-                                  <button
-                                    key={val}
-                                    onClick={() => updateQuestion(idx, 'correct_answer', val)}
-                                    className={`px-5 py-2 rounded-xl text-sm font-bold transition-all
-                                      ${q.correct_answer === val ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500 hover:bg-blue-50'}`}
-                                  >
-                                    {val === 'true' ? '✓ Đúng' : '✗ Sai'}
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                              <label className="block text-xs font-bold text-slate-600 mb-1">Chủ đề</label>
-                              <select
-                                value={q.category}
-                                onChange={e => updateQuestion(idx, 'category', e.target.value)}
-                                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                              >
-                                {CATEGORY_OPTIONS.map(c => (
-                                  <option key={c} value={c}>{c}</option>
-                                ))}
-                              </select>
-                            </div>
-                            <div>
-                              <label className="block text-xs font-bold text-slate-600 mb-1">Lời giải (tùy chọn)</label>
-                              <input
-                                type="text"
-                                value={q.solution || ''}
-                                onChange={e => updateQuestion(idx, 'solution', e.target.value || null)}
-                                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                                placeholder="Đáp án / lời giải…"
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
+              <textarea
+                value={rawText}
+                onChange={e => setRawText(e.target.value)}
+                className="w-full h-[600px] p-6 border border-slate-300 rounded-2xl focus:outline-none focus:ring-4 focus:ring-blue-500/20 text-[15px] font-medium text-slate-800 bg-white leading-relaxed resize-y font-mono shadow-inner"
+                spellCheck={false}
+              />
             </div>
 
             {/* Create button */}
@@ -625,7 +382,7 @@ export default function AnalyzeExam() {
                   </svg>
                   Đang tạo đề thi…
                 </span>
-              ) : `💾 Lưu đề thi (${questions.length} câu hỏi)`}
+              ) : `💾 Lưu đề thi`}
             </button>
           </div>
         )}
@@ -653,12 +410,7 @@ export default function AnalyzeExam() {
                 onClick={() => {
                   setStep('upload');
                   setFile(null);
-                  setQuestions([]);
-                  setExamTitle('');
-                  setExamDesc('');
-                  setExamDuration(60);
-                  setCreatedExam(null);
-                  setExpandedIdx(null);
+                  setRawText('');
                 }}
                 className="px-8 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold rounded-2xl hover:opacity-90 transition-all"
               >
