@@ -8,7 +8,7 @@ from uuid import UUID
 router = APIRouter()
 
 @router.get("/", response_model=List[Student])
-def get_students(current_user = Depends(get_current_teacher)):
+async def get_students(current_user = Depends(get_current_teacher)):
     # Get students linked to this teacher
     teacher_id = current_user.id
     
@@ -27,7 +27,7 @@ def get_students(current_user = Depends(get_current_teacher)):
     return students
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
-def add_student(student_in: StudentCreate, current_user = Depends(get_current_teacher)):
+async def add_student(student_in: StudentCreate, current_user = Depends(get_current_teacher)):
     teacher_id = current_user.id
     
     # Find student by email
@@ -72,7 +72,7 @@ def add_student(student_in: StudentCreate, current_user = Depends(get_current_te
         )
 
 @router.delete("/{student_id}")
-def remove_student(student_id: UUID, current_user = Depends(get_current_teacher)):
+async def remove_student(student_id: UUID, current_user = Depends(get_current_teacher)):
     teacher_id = current_user.id
     
     try:
