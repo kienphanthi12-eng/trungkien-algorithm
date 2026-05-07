@@ -38,9 +38,29 @@ As of Phase 9, the app uses a unified codebase with role-based layouts:
 - `FigureEditor/Renderer`: Custom tool for creating and displaying geometric figures via JSON/SVG.
 - `MarkdownRenderer`: Unified component for LaTeX and Markdown support.
 
-## 🎯 Next Steps & Plans
-1. **AI Enhancement**: Optimize the prompts for "Tạo biến thể AI" to support more complex geometry templates.
-2. **Classroom Analytics**: Add charts/stats to the Teacher Dashboard to track student progress over time.
-3. **Real-time Notifications**: Notify students when a new assignment is assigned.
-4. **Mobile Polish**: Ensure the new sidebar and topnav work perfectly on tablets and phones.
-5. **Classroom Detail Improvement**: Add student performance summary within the Classroom Detail view.
+## 🗺️ Long-term Roadmap
+
+### Phase 10: AI Optimization & Multi-platform (Months 1-2)
+- **AI Variant 2.0**: Advanced geometric understanding for automated problem variation.
+- **Mobile First**: Full responsive optimization for tablets and smartphones.
+- **Real-time Notifications**: Assignment and submission alerts via WebSockets.
+
+### Phase 11: Smart Analytics & Dashboard (Months 3-4)
+- **Teacher Analytics**: Visualizing completion rates, score distributions, and student progress.
+- **Learning Alerts**: AI-driven identification of students needing support.
+- **Academic Portfolio**: Long-term tracking of student performance and competency maps.
+
+### Phase 12: Engagement & Personalization (Months 5-6)
+- **AI Learning Path**: Personalized problem suggestions based on individual ability.
+- **AI Tutor**: Interactive step-by-step guidance without revealing answers directly.
+- **Gamification**: Badges, points, and leaderboards to boost student engagement.
+
+### Phase 13: Ecosystem & Community (Months 7+)
+- **ZENTUS Library**: Open repository for sharing high-quality exams and problems.
+- **ZENTUS Arena**: Real-time online math competitions and mock exams.
+- **LMS Integration**: Seamless sync with Google Classroom and Microsoft Teams.
+
+## 🛡️ Technical Foundation (Ongoing)
+1. **Security**: Advanced RLS policies and data encryption.
+2. **Performance**: Query optimization and CDN integration for assets.
+3. **Infrastructure**: Scaling to enterprise-grade cloud hosting (AWS/GCP).
