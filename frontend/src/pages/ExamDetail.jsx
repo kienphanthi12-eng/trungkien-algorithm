@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { getExam, getStudents, createAssignment, generateExamVariant, updateProblem } from '../services/api';
+import { getExam, getStudents, createAssignment, generateExamVariant, updateProblem, generateProblemFigure } from '../services/api';
 import MarkdownRenderer from '../components/MarkdownRenderer';
 import PrintableExam from '../components/PrintableExam';
 import FigureRenderer from '../components/FigureRenderer';
@@ -49,6 +49,29 @@ export default function ExamDetail() {
   // Expanded question
   const [expandedIdx, setExpandedIdx] = useState(null);
   const [variantLoading, setVariantLoading] = useState(false);
+  const [generatingFigureId, setGeneratingFigureId] = useState(null);
+
+  const handleGenerateFigure = async (problemId) => {
+    setGeneratingFigureId(problemId);
+    try {
+      const res = await generateProblemFigure(token, problemId);
+      // Update local state
+      setExam(prev => ({
+        ...prev,
+        problems: prev.problems.map(item => {
+          const p = item.problem || item;
+          if (p.id === problemId) {
+            return { ...item, problem: { ...p, figure_image: res.figure_image } };
+          }
+          return item;
+        })
+      }));
+    } catch (err) {
+      alert("Lỗi khi sinh hình: " + err.message);
+    } finally {
+      setGeneratingFigureId(null);
+    }
+  };
 
   // Printing logic
   const componentRef = useRef();
@@ -307,6 +330,18 @@ export default function ExamDetail() {
                         <div>
                           <p className="text-xs font-bold text-slate-500 mb-1">Nội dung câu hỏi</p>
                           <MarkdownRenderer content={p.description} className="text-sm" />
+                          
+                          {/* Hiển thị ảnh AI */}
+                          {p.figure_image && (
+                            <div className="my-4 flex justify-center">
+                              <img 
+                                src={p.figure_image.startsWith('data:') ? p.figure_image : `data:image/png;base64,${p.figure_image}`} 
+                                alt="AI Generated Figure" 
+                                className="max-w-full rounded-lg border shadow-sm max-h-[300px] object-contain" 
+                              />
+                            </div>
+                          )}
+
                           {p.figure_json && <FigureRenderer data={p.figure_json} />}
 
                           {/* Editor Trigger - DEBUG: Show for everyone */}
@@ -319,12 +354,21 @@ export default function ExamDetail() {
                                   onCancel={() => setEditingProblem(null)}
                                 />
                               ) : (
-                                <button 
-                                  onClick={() => setEditingProblem(p)}
-                                  className="text-xs flex items-center gap-1 text-blue-600 hover:text-blue-800 font-medium py-1 px-2 rounded-lg bg-blue-50 border border-blue-100"
-                                >
-                                  ✏️ {p.figure_json ? 'Sửa hình vẽ' : 'Thêm hình vẽ'}
-                                </button>
+                                <div className="flex items-center gap-2">
+                                  <button 
+                                    onClick={() => handleGenerateFigure(p.id)}
+                                    disabled={generatingFigureId === p.id}
+                                    className="text-xs flex items-center gap-1 text-purple-600 hover:text-purple-800 font-medium py-1 px-2 rounded-lg bg-purple-50 border border-purple-100 disabled:opacity-50 transition-colors"
+                                  >
+                                    {generatingFigureId === p.id ? '⏳ Đang vẽ...' : '🎨 Sinh hình AI'}
+                                  </button>
+                                  <button 
+                                    onClick={() => setEditingProblem(p)}
+                                    className="text-xs flex items-center gap-1 text-blue-600 hover:text-blue-800 font-medium py-1 px-2 rounded-lg bg-blue-50 border border-blue-100 transition-colors"
+                                  >
+                                    ✏️ {(p.figure_json || p.figure_image) ? 'Sửa hình vẽ tay' : 'Vẽ hình thủ công'}
+                                  </button>
+                                </div>
                               )}
                             </div>
                           )}
