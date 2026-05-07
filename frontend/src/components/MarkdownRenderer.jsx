@@ -1,5 +1,6 @@
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
+import remarkGfm from 'remark-gfm';
 import rehypeKatex from 'rehype-katex';
 
 /**
@@ -27,7 +28,7 @@ export default function MarkdownRenderer({ content, className = "", compact = fa
   return (
     <div className={`prose prose-slate max-w-none ${compact ? '[&_p]:my-0 [&_p]:leading-snug text-sm' : 'prose-math:my-4'} ${className}`}>
       <ReactMarkdown
-        remarkPlugins={[remarkMath]}
+        remarkPlugins={[remarkMath, remarkGfm]}
         rehypePlugins={[rehypeKatex]}
         components={{
           // Tùy chỉnh các thẻ HTML nếu cần (ví dụ: link mở tab mới)
