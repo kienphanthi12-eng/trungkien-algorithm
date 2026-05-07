@@ -28,7 +28,7 @@ function textToQuestions(text) {
   return blocks.map((block, idx) => {
     const lines = block.split('\n');
     const q = {
-      title: \`Câu \${idx + 1}\`, description: '', problem_type: 'multiple_choice',
+      title: `Câu ${idx + 1}`, description: '', problem_type: 'multiple_choice',
       difficulty: 'medium', category: 'Tổng hợp',
       choices: { A: '', B: '', C: '', D: '' }, correct_answer: null, solution: null
     };
