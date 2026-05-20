@@ -1,5 +1,5 @@
 // Backend URL updated to Railway production
-const API_BASE_URL = 'https://trungkien-algorithm-production.up.railway.app';
+export const API_BASE_URL = 'https://trungkien-algorithm-production.up.railway.app';
 
 // ─── 401 Auto-Refresh Interceptor ────────────────────────────────────────────
 // AuthContext calls setRefreshCallback(doRefresh) on mount so that any 401
@@ -36,7 +36,7 @@ async function _doRefreshOnce() {
 }
 
 // Central fetch wrapper: retries once with a fresh token on 401.
-async function _authFetch(url, init, token) {
+export async function _authFetch(url, init, token) {
   const response = await fetch(url, {
     ...init,
     headers: { ...init.headers, Authorization: `Bearer ${token}` },

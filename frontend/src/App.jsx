@@ -18,6 +18,9 @@ import AnalyzeExam from './pages/AnalyzeExam'
 import ClassroomList from './pages/ClassroomList'
 import ClassroomDetail from './pages/ClassroomDetail'
 import ExamDetail from './pages/ExamDetail'
+import Learn from './pages/Learn'
+import LessonPage from './pages/LessonPage'
+import Progress from './pages/Progress'
 
 function App() {
   return (
@@ -40,6 +43,12 @@ function App() {
               <Route path="/assignments/:assignmentId" element={<AssignmentDetail />} />
               <Route path="/classrooms" element={<ClassroomList />} />
               <Route path="/classrooms/:classroomId" element={<ClassroomDetail />} />
+
+              {/* Student learning routes */}
+              <Route path="/learn" element={<Learn />} />
+              <Route path="/learn/:subjectId" element={<Learn />} />
+              <Route path="/learn/:subjectId/:lessonId" element={<LessonPage />} />
+              <Route path="/progress" element={<Progress />} />
 
               {/* Teacher-only routes */}
               <Route element={<TeacherRoute />}>

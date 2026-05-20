@@ -3,8 +3,10 @@ import { useAuth } from '../contexts/AuthContext';
 import logo from '../assets/logo.png';
 
 const NAV_ITEMS = [
-  { to: '/assignments', label: 'Bài tập của tôi' },
-  { to: '/exams', label: 'Kho đề thi' },
+  { to: '/learn', label: '🎓 Học bài' },
+  { to: '/progress', label: '📊 Tiến độ' },
+  { to: '/assignments', label: 'Bài tập' },
+  { to: '/exams', label: 'Đề thi' },
   { to: '/problems', label: 'Bài toán' },
 ];
 

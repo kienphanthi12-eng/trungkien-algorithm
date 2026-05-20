@@ -1,11 +1,15 @@
 import os
 import asyncio
+import json
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from typing import List
+from typing import List, Dict, Any
 from app.services.supabase_client import supabase_client
 from app.api.dependencies import get_current_user
 from app.services.llm_proxy import LLMProxy
+from app.services.lesson_service import LessonService
+from app.services.lesson_prompts import get_prompt
 
 router = APIRouter()
 
@@ -236,3 +240,121 @@ async def chat_message(
             status_code=500,
             detail=f"Lỗi khi gọi AI: {str(e)}",
         )
+
+
+# ─── Lesson Chat Schemas & Router ───────────────────────────────────────────
+
+class LessonChatRequest(BaseModel):
+    messages: List[Dict[str, Any]]
+    lesson_id: str
+    mode: str = "giang"
+    user_id: str
+    stream: bool = False
+
+@router.post("/lesson")
+async def chat_lesson(req: LessonChatRequest, current_user=Depends(get_current_user)):
+    """
+    Interact with the Mathora AI Teacher for a specific lesson and study mode.
+    Maintains a session chat in Supabase and queries DeepSeek LLM.
+    Strictly adheres to: Endpoint -> Service -> Supabase client pattern.
+    """
+    if str(current_user.id) != req.user_id:
+        raise HTTPException(status_code=403, detail="Not authorized to act on behalf of this user")
+
+    # 1. Fetch lesson info from DB using service
+    lesson = LessonService.get_lesson_by_id(req.lesson_id)
+    if not lesson:
+        raise HTTPException(status_code=404, detail="Lesson not found")
+
+    grade = lesson.get("grade", 9)
+    lesson_title = lesson.get("title", "")
+    objectives = lesson.get("objectives", [])
+    topic_title = lesson.get("topic_title", "")
+
+    # 2. Build system prompt
+    system_prompt = get_prompt(
+        mode=req.mode,
+        grade=grade,
+        lesson_title=lesson_title,
+        objectives=objectives,
+        topic=topic_title
+    )
+
+    # 3. Format and clean messages history
+    formatted_messages = []
+    for msg in req.messages:
+        role = msg.get("role")
+        content = msg.get("content")
+        # If content is a dict (AI json response format), serialize it back to string
+        if isinstance(content, dict):
+            content_str = json.dumps(content, ensure_ascii=False)
+        else:
+            content_str = str(content)
+        formatted_messages.append({"role": role, "content": content_str})
+
+    # Limit history to keep costs in check
+    recent_messages = formatted_messages[-10:] if len(formatted_messages) > 10 else formatted_messages
+
+    # Get or create the session
+    session = LessonService.get_or_create_lesson_session(req.user_id, req.lesson_id, req.mode)
+    session_id = session.get("id")
+
+    # 4. If stream is requested, stream the OpenAI completions
+    if req.stream:
+        async def event_generator():
+            full_response = ""
+            async for chunk in LLMProxy.stream_deepseek_lesson(recent_messages, system_prompt):
+                full_response += chunk
+                yield chunk
+            
+            # Save the full chat conversation to session
+            try:
+                chat_history = req.messages.copy()
+                try:
+                    ai_reply = json.loads(full_response)
+                except Exception:
+                    ai_reply = {"display": full_response, "speak": "Bài giảng của thầy đã sẵn sàng."}
+                chat_history.append({"role": "assistant", "content": ai_reply})
+                LessonService.save_lesson_session_chat(session_id, chat_history)
+            except Exception as e:
+                logger.error(f"Error saving stream chat history: {e}")
+
+        return StreamingResponse(event_generator(), media_type="text/event-stream")
+    
+    # 5. Non-streaming call
+    try:
+        reply = await LLMProxy.call_deepseek_lesson(recent_messages, system_prompt)
+        
+        # Save session history
+        chat_history = req.messages.copy()
+        chat_history.append({"role": "assistant", "content": reply})
+        LessonService.save_lesson_session_chat(session_id, chat_history)
+        
+        return {"reply": reply}
+    except Exception as e:
+        logger.error(f"Error during DeepSeek lesson call: {e}")
+        # Return a fallback JSON response if the LLM output is not valid JSON or if call fails
+        fallback_reply = {
+            "speak": "Thầy xin lỗi, hệ thống đang gặp gián đoạn một chút. Thầy sẽ giải thích lại ngay.",
+            "display": f"Đã xảy ra lỗi kết nối với AI Giáo Viên: {str(e)}. Vui lòng thử lại sau giây lát!",
+            "steps": [],
+            "question": "Em có muốn thử tải lại bài học không?"
+        }
+        return {"reply": fallback_reply}
+
+
+@router.get("/lesson/session")
+def get_lesson_session(lesson_id: str, mode: str, user_id: str, current_user=Depends(get_current_user)):
+    """
+    Get the existing chat history and session for a student's lesson and mode.
+    """
+    if str(current_user.id) != user_id:
+        raise HTTPException(status_code=403, detail="Not authorized to access this session")
+        
+    try:
+        session = LessonService.get_or_create_lesson_session(user_id, lesson_id, mode)
+        return session
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+

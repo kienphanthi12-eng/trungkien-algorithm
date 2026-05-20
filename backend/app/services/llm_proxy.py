@@ -1,9 +1,18 @@
 import os
 import logging
 import httpx
+import re
 from typing import List, Dict, Any, Optional
+from openai import AsyncOpenAI
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+
+deepseek_client = AsyncOpenAI(
+    api_key=settings.DEEPSEEK_API_KEY or "placeholder",
+    base_url="https://api.deepseek.com"
+)
+
 
 class LLMProxy:
     """
@@ -218,4 +227,50 @@ class LLMProxy:
         if not rates:
             return 0.0
         return (prompt_tokens / 1_000_000) * rates["input"] + (completion_tokens / 1_000_000) * rates["output"]
+
+    @staticmethod
+    async def stream_deepseek_lesson(messages: list, system_prompt: str):
+        """Stream response từ DeepSeek, trả về JSON chunks, loại bỏ think tags nếu dùng R1"""
+        stream = await deepseek_client.chat.completions.create(
+            model="deepseek-chat",
+            messages=[{"role": "system", "content": system_prompt}] + messages,
+            response_format={"type": "json_object"},
+            stream=True,
+            max_tokens=2000
+        )
+        in_think_block = False
+        async for chunk in stream:
+            delta = chunk.choices[0].delta.content
+            if not delta:
+                continue
+            
+            # Simple RLS/R1 <think> block stripping for stream
+            if "<think>" in delta:
+                in_think_block = True
+                delta = delta.split("<think>", 1)[0]
+            if "</think>" in delta:
+                in_think_block = False
+                delta = delta.split("</think>", 1)[1]
+            
+            if in_think_block:
+                continue
+                
+            if delta:
+                yield delta
+
+    @staticmethod
+    async def call_deepseek_lesson(messages: list, system_prompt: str) -> dict:
+        """Gọi DeepSeek không stream, trả về dict đã parse"""
+        response = await deepseek_client.chat.completions.create(
+            model="deepseek-chat",
+            messages=[{"role": "system", "content": system_prompt}] + messages,
+            response_format={"type": "json_object"},
+            max_tokens=2000
+        )
+        import json
+        content = response.choices[0].message.content
+        # Remove think tags if any
+        content_clean = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL).strip()
+        return json.loads(content_clean)
+
 
